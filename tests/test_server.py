@@ -3,6 +3,7 @@ import socket
 import threading
 import time
 import unittest
+from core.game_manager import GameManager
 from core.room import Room
 from core.server import LanTCPServer
 from games import connect4, bingo, liars_dice, battleship
@@ -16,6 +17,18 @@ class TestServerInit(unittest.TestCase):
             self.assertEqual(room.players[0].name, "TestHost")
             self.assertTrue(room.players[0].is_host)
             self.assertEqual(room.game_module, g)
+
+    def test_game_manager_apply_action(self):
+        gm = GameManager(connect4)
+        sessions = [{"id": 0, "name": "P1"}, {"id": 1, "name": "P2"}]
+        gm.initialize(sessions)
+
+        valid, action_data = connect4.parse_action(gm.state, 0, "3")
+        self.assertTrue(valid)
+
+        events = gm.apply_action(0, action_data)
+        self.assertIn("log", events)
+        self.assertIn("column 3", events["log"][0])
 
     def test_client_join_integration(self):
         room = Room("HostUser", connect4)

@@ -26,6 +26,10 @@ class GameManager:
         """Return prompt string for input."""
         return self.module.prompt_for(self.state, player_id)
 
+    def apply_action(self, player_id, action_data):
+        """Apply pre-parsed action data to game state."""
+        return self.module.apply_action(self.state, player_id, action_data)
+
     def parse_and_apply(self, player_id, raw_action):
         """
         Validate and apply an action from player_id.
