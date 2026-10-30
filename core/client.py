@@ -77,6 +77,7 @@ class ClientSession:
                 print(self.game_module.render_final(self.view, msg_text, winners))
             else:
                 print(paint(f"\n  {msg_text}", "1;33"))
+            print(paint("\n  Press Enter to return to the main menu...", "1;36"))
 
     def send(self, payload):
         data = encode_message(payload)
@@ -180,6 +181,12 @@ class ClientSession:
             if self.turn_event.wait(0.2):
                 self.ask_move()
         thread.join(timeout=1.0)
+        if self.started:
+            flush_stdin()
+            try:
+                input()
+            except (KeyboardInterrupt, EOFError):
+                pass
 
 
 def join_lan_game():

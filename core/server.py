@@ -156,6 +156,7 @@ def play_lan_host(room):
     clear_screen()
     final_host_view = gm.get_view_for(0)
     print(room.game_module.render_final(final_host_view, msg, winners))
+    input("\n  Press Enter to return to the menu...")
 
 
 def host_lan_game_session(game_module):
