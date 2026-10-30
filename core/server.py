@@ -26,7 +26,7 @@ class LanTCPServer(socketserver.ThreadingTCPServer):
 
 class LanRequestHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        self.server.room.client_handler(self.request)
+        client_handler(self.server.room, self.request)
 
 
 def client_handler(room, sock):
@@ -94,8 +94,6 @@ def client_handler(room, sock):
             pass
 
 
-# Attach client_handler to Room
-setattr(LanRequestHandler, "client_handler", client_handler)
 
 
 def play_lan_host(room):
