@@ -6,14 +6,18 @@ A modular, terminal-based multiplayer LAN game platform built in Python. Designe
 
 ## 🌟 Features
 
-- **Host-Authoritative Architecture**: The host machine manages game state, move validation, line detection, turn progression, and scoring.
-- **Privacy Enforcement**: Private game information (e.g., hidden dice in Liar's Dice, hidden fleets in Battleship) is strictly filtered before being sent to individual player clients.
+- **Host-Authoritative Architecture**: The host machine manages game state, move validation, turn progression, and scoring.
+- **Privacy Enforcement**: Private game information (e.g., hidden hands in UNO, hidden dice in Liar's Dice, hidden fleets in Battleship) is strictly filtered before being sent to individual player clients.
 - **Unified Game Framework**: All games share the same TCP networking, room management, lobby system, and message protocol.
-- **Multiple Supported Games**:
+- **8 Supported Games**:
   1. **Bingo 1–25** (2–4 Players) - Number calling, complete line detection, solo vs PC mode, local pass-and-play.
   2. **Connect Four** (2 Players) - Classic 6x7 strategy board game.
   3. **Liar's Dice** (2–4 Players) - Bluffing, secret dice rolling, and bidding.
   4. **Battleship** (2 Players) - Hidden 5x5 grids and coordinate targeting.
+  5. **UNO / Card Craze** (2–4 Players) - Card shedding with Skip, Reverse, Draw Two, Wild, and Wild Draw Four cards.
+  6. **Dots and Boxes** (2–4 Players) - Connect grid dots to claim boxes and earn extra turns.
+  7. **Tic-Tac-Toe** (2 Players) - Classic 3x3 strategy grid game.
+  8. **Mastermind** (2 Players) - Deductive logic codebreaking.
 - **Zero External Dependencies**: Runs entirely on Python 3.9+ standard library.
 
 ---
@@ -31,7 +35,7 @@ On the **Host** device:
 python3 lan_core.py
 ```
 1. Select `1. Host a LAN Game`.
-2. Choose your game (`Bingo`, `Connect Four`, `Liar's Dice`, `Battleship`).
+2. Choose your game.
 3. Note the displayed LAN IP address (e.g. `192.168.1.105`) and Port (`50555`).
 4. Share the IP with your friends.
 5. Once your friends join the lobby, press **Enter** to start!
@@ -49,62 +53,16 @@ python3 lan_core.py
 
 ## 🎲 Available Games
 
-### 1. Bingo (1–25)
-- **Players**: 2–4
-- **Rules**: Call unused numbers on your turn. Every completed row, column, or diagonal earns a letter in `B-I-N-G-O`. First to complete all 5 letters wins.
-- **Single-Player Mode**: Includes a Solo mode to play against intelligent PC opponents.
-
-### 2. Connect Four
-- **Players**: 2
-- **Rules**: Drop tokens into a 6x7 grid. Connect 4 tokens horizontally, vertically, or diagonally to win.
-
-### 3. Liar's Dice
-- **Players**: 2–4
-- **Rules**: Each player starts with 5 secret dice. Players make bids on the total quantity of a dice face showing across all players. Challenge a bid if you think it's a bluff!
-
-### 4. Battleship
-- **Players**: 2
-- **Rules**: Place your fleet on a hidden 5x5 grid. Call coordinates (`A1` to `E5`) to target and destroy the enemy fleet.
-
----
-
-## 🛠️ Project Structure
-
-```
-lan_arcade/
-│
-├── lan_core.py          # Main application launcher and top-level menus
-├── config.py            # Global settings, color definitions, and terminal utilities
-├── protocol.py          # JSON message serialization and message types
-├── README.md            # Documentation and user manual
-│
-├── core/                # Core networking and orchestration framework
-│   ├── client.py        # Client connection session and background receiver thread
-│   ├── server.py        # TCP server and authoritative host game orchestrator
-│   ├── room.py          # Room state, player sessions, and message queue
-│   ├── game_manager.py  # Bridge loading game engines into the network framework
-│   ├── session.py       # Server-side player session data model
-│   ├── renderer.py      # Common terminal UI rendering functions
-│   └── exceptions.py   # Custom exception classes
-│
-├── games/               # Modular game implementations
-│   ├── bingo.py         # Bingo engine (LAN multiplayer & Solo vs PC)
-│   ├── connect4.py      # Connect Four strategy engine
-│   ├── liars_dice.py    # Liar's Dice bluffing engine
-│   └── battleship.py    # Battleship grid combat engine
-│
-├── utils/               # Utilities
-│   ├── network.py       # LAN IP address auto-discovery
-│   ├── validation.py    # Name and coordinate validation helpers
-│   └── logger.py        # Application logging
-│
-└── tests/               # Comprehensive unit test suite
-    ├── test_protocol.py
-    ├── test_bingo.py
-    ├── test_connect4.py
-    ├── test_liars_dice.py
-    └── test_battleship.py
-```
+| # | Game | Players | Game Type | Objective / Description |
+|---|---|---|---|---|
+| **1** | **Bingo (1–25)** | 2–4 Players *(+ Solo vs PC)* | Number Calling | Call numbers 1–25 to complete lines on your 5x5 board. First to complete 5 lines to spell `B-I-N-G-O` wins! |
+| **2** | **Connect Four** | 2 Players | Board Strategy | Drop tokens into a 6x7 grid. Connect 4 tokens in a row horizontally, vertically, or diagonally to win. |
+| **3** | **Liar's Dice** | 2–4 Players | Bluffing & Hidden Dice | Reroll secret dice each round. Bid on total dice counts or call out opponents' bluffs. Last survivor wins! |
+| **4** | **Battleship** | 2 Players | Hidden Grid Combat | Place a fleet of 3 ships on a hidden 5x5 grid. Take turns targeting coordinates (`A1`–`E5`) to sink the enemy fleet! |
+| **5** | **UNO / Card Craze** | 2–4 Players | Card Shedding | Match color/symbol, play Skip, Reverse, +2, +4, and Wild cards. First to empty their hand wins! |
+| **6** | **Dots and Boxes** | 2–4 Players | Territory Strategy | Connect dots on a grid to complete boxes. Claiming a box awards an extra turn! |
+| **7** | **Tic-Tac-Toe** | 2 Players | Quick Grid Strategy | Take turns placing X or O on a 3x3 grid. Form 3 in a row to win! |
+| **8** | **Mastermind** | 2 Players | Deductive Logic | Codemaker sets a 4-digit secret code; Codebreaker gets 10 attempts with Black/White peg feedback. |
 
 ---
 
@@ -115,11 +73,3 @@ Run all unit tests using Python's built-in `unittest`:
 ```bash
 python3 -m unittest discover -s tests
 ```
-
----
-
-## 🔒 Wi-Fi & Firewall Troubleshooting
-
-If your friends cannot connect to your host machine:
-1. **Firewall Settings**: Ensure Python is allowed through your computer's OS firewall for inbound TCP connections on port `50555`.
-2. **Client Isolation**: Some college Wi-Fi networks enable *Client Isolation*, which prevents devices on the network from talking directly to each other. If this is enabled, host a Wi-Fi hotspot from your mobile phone or laptop and have everyone connect to it.
