@@ -103,7 +103,7 @@ def view_for(state, player_id):
 
 
 def prompt_for(state_or_view, player_id):
-    return "Enter card index to play (1–N), 'D' to draw, or 'W Red/Green/Blue/Yellow' for Wild"
+    return "Enter card index to play (1–N), 'D' to draw, or '1 Red/Green/Blue/Yellow' for Wild"
 
 
 def parse_action(state_or_view, player_id, raw_input):
@@ -120,13 +120,22 @@ def parse_action(state_or_view, player_id, raw_input):
     except ValueError:
         return False, "Card index must be a number."
 
-    own_hand = state_or_view.get("own_hand", [])
+    if "hands" in state_or_view:
+        own_hand = state_or_view["hands"].get(player_id, [])
+    else:
+        own_hand = state_or_view.get("own_hand", [])
+
     if not 0 <= idx < len(own_hand):
         return False, f"Invalid card index. Choose between 1 and {len(own_hand)}."
 
     card = own_hand[idx]
-    top_card = state_or_view["top_card"]
-    active_color = state_or_view["active_color"]
+
+    if "discard" in state_or_view and state_or_view["discard"]:
+        top_card = state_or_view["discard"][-1]
+    else:
+        top_card = state_or_view.get("top_card", {"color": "Wild", "value": "Wild"})
+
+    active_color = state_or_view.get("active_color", top_card.get("color"))
 
     # Check Wild color selection
     chosen_color = None

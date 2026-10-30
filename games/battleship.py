@@ -109,14 +109,18 @@ def parse_action(state_or_view, player_id, raw_input):
         return False, f"Invalid coordinate '{raw_input}'. Enter A1–E5."
 
     r, c = coord
-    my_shots = state_or_view.get("my_shots", {})
 
-    # convert string keys back to tuples if needed
-    if isinstance(my_shots, dict):
-        shot_tuples = {
-            (int(k.split(",")[0]), int(k.split(",")[1])) if isinstance(k, str) else k
-            for k in my_shots.keys()
-        }
+    if "shots" in state_or_view and isinstance(state_or_view["shots"], dict):
+        shot_tuples = set(state_or_view["shots"].get(player_id, {}).keys())
+    elif "my_shots" in state_or_view:
+        my_shots = state_or_view.get("my_shots", {})
+        if isinstance(my_shots, dict):
+            shot_tuples = {
+                (int(k.split(",")[0]), int(k.split(",")[1])) if isinstance(k, str) else k
+                for k in my_shots.keys()
+            }
+        else:
+            shot_tuples = set()
     else:
         shot_tuples = set()
 
