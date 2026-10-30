@@ -51,18 +51,56 @@ python3 lan_core.py
 
 ---
 
-## 🎲 Available Games
+## 📖 How to Play & Input Format Guide
 
-| # | Game | Players | Game Type | Objective / Description |
-|---|---|---|---|---|
-| **1** | **Bingo (1–25)** | 2–4 Players *(+ Solo vs PC)* | Number Calling | Call numbers 1–25 to complete lines on your 5x5 board. First to complete 5 lines to spell `B-I-N-G-O` wins! |
-| **2** | **Connect Four** | 2 Players | Board Strategy | Drop tokens into a 6x7 grid. Connect 4 tokens in a row horizontally, vertically, or diagonally to win. |
-| **3** | **Liar's Dice** | 2–4 Players | Bluffing & Hidden Dice | Reroll secret dice each round. Bid on total dice counts or call out opponents' bluffs. Last survivor wins! |
-| **4** | **Battleship** | 2 Players | Hidden Grid Combat | Place a fleet of 3 ships on a hidden 5x5 grid. Take turns targeting coordinates (`A1`–`E5`) to sink the enemy fleet! |
-| **5** | **UNO / Card Craze** | 2–4 Players | Card Shedding | Match color/symbol, play Skip, Reverse, +2, +4, and Wild cards. First to empty their hand wins! |
-| **6** | **Dots and Boxes** | 2–4 Players | Territory Strategy | Connect dots on a grid to complete boxes. Claiming a box awards an extra turn! |
-| **7** | **Tic-Tac-Toe** | 2 Players | Quick Grid Strategy | Take turns placing X or O on a 3x3 grid. Form 3 in a row to win! |
-| **8** | **Mastermind** | 2 Players | Deductive Logic | Codemaker sets a 4-digit secret code; Codebreaker gets 10 attempts with Black/White peg feedback. |
+### 1. Bingo (1–25)
+- **Rules**: Call an unused number from 1 to 25. Complete rows, columns, or diagonals to earn letters in `B-I-N-G-O`. First to spell all 5 letters wins.
+- **Input Format**: Type a single number:
+  - `12` or `5` or `25`
+
+### 2. Connect Four
+- **Rules**: Drop your token (`X` or `O`) into one of the 7 columns. First to connect 4 in a row horizontally, vertically, or diagonally wins.
+- **Input Format**: Type the column number (1 to 7):
+  - `3` or `1` or `7`
+
+### 3. Liar's Dice
+- **Rules**: Make a claim about the total count of a dice face across **ALL** players' secret hands (e.g. "three 4s"). 
+  - To raise, bid a higher quantity (e.g. `4 4`) or higher face at same quantity (e.g. `3 5`).
+  - If you think the previous bid is a lie, challenge it by typing `C`.
+  - If the bid was truthful, the challenger loses 1 die. If it was a bluff, the bidder loses 1 die.
+- **Input Format**:
+  - To Bid: `<quantity> <face>` separated by a space (e.g. `2 1` for two 1s, or `3 4` for three 4s). Do **not** use quotes!
+  - To Challenge: `C` or `challenge`
+
+### 4. Battleship
+- **Rules**: Target coordinates on the enemy's hidden 5x5 grid (Columns A–E, Rows 1–5). Sink all 3 enemy ships (7 total hits) to win.
+- **Input Format**: Type column letter + row number:
+  - `C3` or `A1` or `E5`
+
+### 5. UNO / Card Craze
+- **Rules**: Match the active card's color or value, or play a Wild card. First player to empty their hand wins.
+  - Action Cards: `Skip`, `Reverse`, `+2`, `Wild`, `Wild +4`.
+- **Input Format**:
+  - Play Regular Card: Type the card number index from your list (e.g. `1` or `3`).
+  - Play Wild Card: Type card index + chosen color (e.g. `1 Red` or `2 Blue`).
+  - Draw Card: Type `D` or `draw`.
+
+### 6. Dots and Boxes
+- **Rules**: Place a horizontal (`H`) or vertical (`V`) edge on the grid. Completing a 1x1 box claims it with your symbol and awards an **extra turn**! Player with most claimed boxes wins.
+- **Input Format**:
+  - Horizontal Edge: `H <row> <col>` (e.g. `H 1 1` for row 1, col 1).
+  - Vertical Edge: `V <row> <col>` (e.g. `V 2 3` for row 2, col 3).
+
+### 7. Tic-Tac-Toe
+- **Rules**: Alternate placing `X` or `O` on a 3x3 grid (cells 1 to 9). Form 3 in a row to win.
+- **Input Format**: Type cell position (1 to 9):
+  - `5` (center) or `1` (top-left) or `9` (bottom-right).
+
+### 8. Mastermind
+- **Rules**: Codemaker secretly sets a 4-digit code using numbers 1–6. Codebreaker gets 10 attempts to guess the exact 4 digits. Feedback gives `Black Pegs` (exact position & number) and `White Pegs` (correct number, wrong position).
+- **Input Format**: 4 space-separated digits between 1 and 6:
+  - Codemaker setting code: `1 4 2 6`
+  - Codebreaker guessing: `1 2 3 4`
 
 ---
 
