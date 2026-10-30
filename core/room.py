@@ -3,11 +3,13 @@ Room class manages connected sessions, lobby state, thread safety, and move queu
 """
 import json
 import queue
+import socket
 import threading
 from collections import deque
 from config import MAX_PLAYERS
 from core.session import PlayerSession
-from protocol import encode_message
+from protocol import decode_message, encode_message
+from utils.validation import clean_name
 
 
 class Room:
@@ -110,3 +112,67 @@ class Room:
                 self.incoming_moves.get_nowait()
             except queue.Empty:
                 return
+
+    def client_handler(self, sock):
+        pid = None
+        try:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            sock.settimeout(10)
+            reader = sock.makefile("r", encoding="utf-8")
+            first = reader.readline()
+            if not first:
+                return
+
+            request = decode_message(first)
+            if not request or request.get("type") != "join":
+                sock.sendall(encode_message({"type": "reject", "message": "Expected join request."}))
+                return
+
+            sock.settimeout(None)
+            raw_name = request.get("name", "Guest")
+            pid, reason = self.add_client(clean_name(raw_name, "Guest"), sock)
+            if pid is None:
+                sock.sendall(encode_message({"type": "reject", "message": reason}))
+                return
+
+            player = self.get_player(pid)
+            self.send(pid, {
+                "type": "joined",
+                "player_id": pid,
+                "name": player.name,
+                "max": self.max_players
+            })
+
+            try:
+                where = sock.getpeername()[0]
+            except OSError:
+                where = "?"
+
+            names = self.player_names()
+            print(f"\n  + {player.name} joined from {where} ({len(names)}/{self.max_players} players: {', '.join(names)})")
+            self.broadcast({"type": "lobby", "names": names})
+
+            for line in reader:
+                message = decode_message(line)
+                if message and message.get("type") == "action":
+                    self.incoming_moves.put((pid, message.get("action")))
+        except (OSError, ValueError):
+            pass
+        finally:
+            if pid is not None:
+                player = self.disconnect(pid)
+                if player is not None and not self.closed:
+                    if not self.started:
+                        names = self.player_names()
+                        print(f"\n  - {player.name} left the lobby ({len(names)}/{self.max_players} players).")
+                        self.broadcast({"type": "lobby", "names": names})
+                    else:
+                        text = f"{player.name} left the game."
+                        print(f"\n  - {text}")
+                        self.log.append(text)
+                        self.broadcast({"type": "notice", "message": text, "players": self.players_payload()})
+            try:
+                sock.close()
+            except OSError:
+                pass

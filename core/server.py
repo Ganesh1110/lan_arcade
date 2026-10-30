@@ -26,74 +26,7 @@ class LanTCPServer(socketserver.ThreadingTCPServer):
 
 class LanRequestHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        client_handler(self.server.room, self.request)
-
-
-def client_handler(room, sock):
-    pid = None
-    try:
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        sock.settimeout(10)
-        reader = sock.makefile("r", encoding="utf-8")
-        first = reader.readline()
-        if not first:
-            return
-
-        request = decode_message(first)
-        if not request or request.get("type") != "join":
-            sock.sendall(encode_message({"type": "reject", "message": "Expected join request."}))
-            return
-
-        sock.settimeout(None)
-        raw_name = request.get("name", "Guest")
-        pid, reason = room.add_client(clean_name(raw_name, "Guest"), sock)
-        if pid is None:
-            sock.sendall(encode_message({"type": "reject", "message": reason}))
-            return
-
-        player = room.get_player(pid)
-        room.send(pid, {
-            "type": "joined",
-            "player_id": pid,
-            "name": player.name,
-            "max": room.max_players
-        })
-
-        try:
-            where = sock.getpeername()[0]
-        except OSError:
-            where = "?"
-
-        names = room.player_names()
-        print(f"\n  + {player.name} joined from {where} ({len(names)}/{room.max_players} players: {', '.join(names)})")
-        room.broadcast({"type": "lobby", "names": names})
-
-        for line in reader:
-            message = decode_message(line)
-            if message and message.get("type") == "action":
-                room.incoming_moves.put((pid, message.get("action")))
-    except (OSError, ValueError):
-        pass
-    finally:
-        if pid is not None:
-            player = room.disconnect(pid)
-            if player is not None and not room.closed:
-                if not room.started:
-                    names = room.player_names()
-                    print(f"\n  - {player.name} left the lobby ({len(names)}/{room.max_players} players).")
-                    room.broadcast({"type": "lobby", "names": names})
-                else:
-                    text = f"{player.name} left the game."
-                    print(f"\n  - {text}")
-                    room.log.append(text)
-                    room.broadcast({"type": "notice", "message": text, "players": room.players_payload()})
-        try:
-            sock.close()
-        except OSError:
-            pass
-
-
+        self.server.room.client_handler(self.request)
 
 
 def play_lan_host(room):
