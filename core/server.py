@@ -9,6 +9,7 @@ import time
 from config import DEFAULT_PORT, paint, clear_screen
 from core.exceptions import InvalidMoveError
 from core.game_manager import GameManager
+from core.room import Room
 from protocol import decode_message, encode_message
 from utils.network import get_lan_ip
 from utils.validation import clean_name
