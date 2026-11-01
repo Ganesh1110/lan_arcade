@@ -12,8 +12,8 @@ from core.client import join_lan_game
 from core.renderer import render_menu
 from core.server import host_lan_game_session
 from games import (
-    bingo, connect4, liars_dice, battleship,
-    uno, dots_and_boxes, tic_tac_toe, mastermind
+    bingo, connect4, battleship,
+    dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors
 )
 
 
@@ -23,12 +23,11 @@ def host_menu():
         options = [
             f"Bingo ({bingo.min_players}–{bingo.max_players} players)",
             f"Connect Four ({connect4.min_players} players)",
-            f"Liar's Dice ({liars_dice.min_players}–{liars_dice.max_players} players)",
             f"Battleship ({battleship.min_players} players)",
-            f"UNO / Card Craze ({uno.min_players}–{uno.max_players} players)",
             f"Dots and Boxes ({dots_and_boxes.min_players}–{dots_and_boxes.max_players} players)",
             f"Tic-Tac-Toe ({tic_tac_toe.min_players} players)",
-            f"Mastermind ({mastermind.min_players} players)",
+            f"Hangman ({hangman.min_players} players)",
+            f"Rock, Paper, Scissors ({rock_paper_scissors.min_players} players)",
             "Back to Main Menu"
         ]
         print(render_menu("HOST A LAN GAME", options))
@@ -41,27 +40,24 @@ def host_menu():
             host_lan_game_session(connect4)
             break
         elif choice == "3":
-            host_lan_game_session(liars_dice)
-            break
-        elif choice == "4":
             host_lan_game_session(battleship)
             break
-        elif choice == "5":
-            host_lan_game_session(uno)
-            break
-        elif choice == "6":
+        elif choice == "4":
             host_lan_game_session(dots_and_boxes)
             break
-        elif choice == "7":
+        elif choice == "5":
             host_lan_game_session(tic_tac_toe)
             break
-        elif choice == "8":
-            host_lan_game_session(mastermind)
+        elif choice == "6":
+            host_lan_game_session(hangman)
             break
-        elif choice == "9":
+        elif choice == "7":
+            host_lan_game_session(rock_paper_scissors)
+            break
+        elif choice == "8":
             break
         else:
-            print("Please enter 1–9.")
+            print("Please enter 1–8.")
             input("Press Enter to continue...")
 
 
