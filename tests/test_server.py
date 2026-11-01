@@ -6,12 +6,15 @@ import unittest
 from core.game_manager import GameManager
 from core.room import Room
 from core.server import LanTCPServer
-from games import connect4, bingo, hangman, battleship, rock_paper_scissors
+from games import (
+    connect4, bingo, hangman, battleship,
+    rock_paper_scissors, shiritori, game2048, number_duel
+)
 
 
 class TestServerInit(unittest.TestCase):
     def test_room_initialization(self):
-        for g in [bingo, connect4, hangman, battleship, rock_paper_scissors]:
+        for g in [bingo, connect4, hangman, battleship, rock_paper_scissors, shiritori, game2048, number_duel]:
             room = Room("TestHost", g)
             self.assertEqual(len(room.players), 1)
             self.assertEqual(room.players[0].name, "TestHost")

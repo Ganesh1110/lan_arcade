@@ -1,12 +1,14 @@
 import unittest
 from games import (
     bingo, connect4, battleship,
-    dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors
+    dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
+    shiritori, game2048, number_duel
 )
 
 ALL_GAMES = [
     bingo, connect4, battleship,
-    dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors
+    dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
+    shiritori, game2048, number_duel
 ]
 
 
@@ -54,6 +56,12 @@ class TestAllGamesContract(unittest.TestCase):
                 raw_input = "COMPUTER"
             elif g == rock_paper_scissors:
                 raw_input = "R"
+            elif g == shiritori:
+                raw_input = "APPLE"
+            elif g == game2048:
+                raw_input = "W"
+            elif g == number_duel:
+                raw_input = "50"
 
             # Parse action on state
             valid_st, act_st = g.parse_action(state, curr_pid, raw_input)
