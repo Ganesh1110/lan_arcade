@@ -14,7 +14,8 @@ from core.server import host_lan_game_session
 from games import (
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
-    shiritori, game2048, number_duel
+    shiritori, game2048, number_duel,
+    boggle, mini_crossword, wordoku, scrabble_sprint
 )
 
 
@@ -32,6 +33,10 @@ def host_menu():
             f"Word Chain / Shiritori ({shiritori.min_players}–{shiritori.max_players} players)",
             f"2048 Versus ({game2048.min_players} players)",
             f"Number Duel High-Low ({number_duel.min_players}–{number_duel.max_players} players)",
+            f"Boggle / Word Hunt ({boggle.min_players}–{boggle.max_players} players)",
+            f"Mini Crossword Race ({mini_crossword.min_players} players)",
+            f"Wordoku Mini Sudoku ({wordoku.min_players} players)",
+            f"Anagram Showdown ({scrabble_sprint.min_players}–{scrabble_sprint.max_players} players)",
             "Back to Main Menu"
         ]
         print(render_menu("HOST A LAN GAME", options))
@@ -68,9 +73,21 @@ def host_menu():
             host_lan_game_session(number_duel)
             break
         elif choice == "11":
+            host_lan_game_session(boggle)
+            break
+        elif choice == "12":
+            host_lan_game_session(mini_crossword)
+            break
+        elif choice == "13":
+            host_lan_game_session(wordoku)
+            break
+        elif choice == "14":
+            host_lan_game_session(scrabble_sprint)
+            break
+        elif choice == "15":
             break
         else:
-            print("Please enter 1–11.")
+            print("Please enter 1–15.")
             input("Press Enter to continue...")
 
 

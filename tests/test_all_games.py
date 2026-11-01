@@ -2,13 +2,15 @@ import unittest
 from games import (
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
-    shiritori, game2048, number_duel
+    shiritori, game2048, number_duel,
+    boggle, mini_crossword, wordoku, scrabble_sprint
 )
 
 ALL_GAMES = [
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
-    shiritori, game2048, number_duel
+    shiritori, game2048, number_duel,
+    boggle, mini_crossword, wordoku, scrabble_sprint
 ]
 
 
@@ -62,6 +64,16 @@ class TestAllGamesContract(unittest.TestCase):
                 raw_input = "W"
             elif g == number_duel:
                 raw_input = "50"
+            elif g == boggle:
+                # Use a letter combination present on board or valid test input
+                raw_input = g.view_for(state, 0)["grid"][0][0] + g.view_for(state, 0)["grid"][0][1] + g.view_for(state, 0)["grid"][0][2]
+            elif g == mini_crossword:
+                raw_input = "1A APPLE"
+            elif g == wordoku:
+                raw_input = "R1 C2 B"
+            elif g == scrabble_sprint:
+                rack = g.view_for(state, 0)["rack"]
+                raw_input = "".join(rack[:3])
 
             # Parse action on state
             valid_st, act_st = g.parse_action(state, curr_pid, raw_input)
