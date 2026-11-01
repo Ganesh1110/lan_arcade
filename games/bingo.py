@@ -30,6 +30,8 @@ LINES = make_lines()
 
 
 def hot_numbers(board, called):
+    if not board or len(board) < 5 or any(len(row) < 5 for row in board):
+        return set()
     called = set(called)
     hot = set()
     for _, cells in LINES:

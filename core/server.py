@@ -74,6 +74,7 @@ def play_lan_host(room):
                     "type": "turn",
                     "player_id": current_pid,
                     "player_name": current_player.name,
+                    "game_id": room.game_module.game_id,
                     "view": view,
                     "players": room.players_payload()
                 })
@@ -150,6 +151,7 @@ def play_lan_host(room):
                 room.send(p.player_id, {
                     "type": "action_result",
                     "caller": current_player.name,
+                    "game_id": room.game_module.game_id,
                     "view": v,
                     "events": events,
                     "players": room.players_payload()

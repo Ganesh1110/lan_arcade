@@ -121,9 +121,13 @@ class ClientSession:
         elif kind == "rematch":
             self.over.clear()
             self.turn_event.clear()
+            if message.get("game_id"):
+                self.game_module = GET_GAME_MODULE(message.get("game_id"))
             self.log.append("🔄 Host started a rematch!")
             self.redraw()
         elif kind == "turn":
+            if message.get("game_id"):
+                self.game_module = GET_GAME_MODULE(message.get("game_id"))
             self.turn_id = message.get("player_id")
             self.turn_name = message.get("player_name", "")
             if message.get("view"):
@@ -134,6 +138,8 @@ class ClientSession:
                 self.turn_event.clear()
             self.redraw()
         elif kind == "action_result":
+            if message.get("game_id"):
+                self.game_module = GET_GAME_MODULE(message.get("game_id"))
             if message.get("view"):
                 self.view = message.get("view")
             caller = message.get("caller", "?")
