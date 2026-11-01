@@ -89,11 +89,22 @@ def play_lan_host(room):
             # Host's local turn
             prompt_str = gm.get_prompt_for(0)
             while True:
-                raw_in = input(f"\n  ▶ YOUR TURN ({current_player.name}) — {prompt_str}: ").strip()
+                raw_in = input(f"\n  ▶ YOUR TURN ({current_player.name}) — {prompt_str} (or '! <msg>' to chat): ").strip()
                 if raw_in.lower() in {"q", "quit"}:
                     print("Ending game...")
                     room.broadcast({"type": "end", "message": "Host ended the game."})
                     return
+                if raw_in.startswith("!"):
+                    msg = raw_in[1:].strip()
+                    if msg:
+                        entry = f"💬 {current_player.name}: {msg}"
+                        room.log.append(entry)
+                        room.broadcast({"type": "chat", "sender": current_player.name, "text": msg, "entry": entry})
+                        clear_screen()
+                        host_view["log"] = list(room.log)
+                        print(room.game_module.render_dashboard(host_view))
+                    continue
+
                 valid, result_or_err = room.game_module.parse_action(gm.state, 0, raw_in)
                 if valid:
                     action_data = result_or_err
@@ -147,16 +158,38 @@ def play_lan_host(room):
     # Game Over
     winners = gm.get_winner()
     msg = f"Winner(s): {', '.join(winners)}" if winners else "Game Over - Draw!"
+
+    # Award Stats
+    for p in room.players:
+        if winners and p.name in winners:
+            p.wins += 1
+        elif winners:
+            p.losses += 1
+
     room.broadcast({
         "type": "end",
         "message": msg,
-        "winners": winners
+        "winners": winners,
+        "players": room.players_payload()
     })
 
     clear_screen()
     final_host_view = gm.get_view_for(0)
     print(room.game_module.render_final(final_host_view, msg, winners))
-    input("\n  Press Enter to return to the menu...")
+
+    print("\n" + paint("=" * 48, "1;36"))
+    print("  1. Rematch (Play Again with same players)")
+    print("  2. Return to Main Menu")
+    print(paint("=" * 48, "1;36"))
+
+    choice = input("\nSelect option [1]: ").strip()
+    if choice == "2":
+        room.broadcast({"type": "end", "message": "Host returned to menu."})
+        return
+    else:
+        room.broadcast({"type": "rematch", "message": "Host initiated a rematch!"})
+        time.sleep(0.8)
+        play_lan_host(room)
 
 
 def host_lan_game_session(game_module):

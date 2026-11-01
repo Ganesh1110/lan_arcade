@@ -55,6 +55,7 @@ class TestServerInit(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+            time.sleep(0.1)
 
 
 if __name__ == "__main__":

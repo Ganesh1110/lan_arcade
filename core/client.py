@@ -27,7 +27,7 @@ class ClientSession:
         self.players = []
         self.turn_id = None
         self.turn_name = ""
-        self.lobby = []
+        self.lobby_players = []
         self.started = False
         self.log = deque(maxlen=6)
 
@@ -48,11 +48,19 @@ class ClientSession:
                 print(paint("       COLLEGE LAN ARCADE — LOBBY", "1;36"))
                 print(paint("=" * 50, "1;36"))
                 print(f"\n  Connected as {paint(self.name, '1;33')}")
-                print(f"\n  Players ({len(self.lobby)}/{MAX_PLAYERS}):")
-                for i, n in enumerate(self.lobby):
-                    tags = (" (host)" if i == 0 else "") + (" (you)" if n == self.name else "")
-                    print(f"    {i + 1}. {n}{tags}")
-                print("\n  Waiting for the host to start the game...")
+                print(f"\n  Players ({len(self.lobby_players)}/{MAX_PLAYERS}):")
+                for i, p in enumerate(self.lobby_players, 1):
+                    p_name = p.get("name", "Guest") if isinstance(p, dict) else str(p)
+                    is_host = p.get("host", False) if isinstance(p, dict) else (i == 1)
+                    is_ready = p.get("ready", True) if isinstance(p, dict) else True
+
+                    host_tag = " " + paint("[HOST]", "1;33") if is_host else ""
+                    you_tag = " " + paint("(you)", "1;36") if p_name == self.name else ""
+                    status_tag = " " + paint("[READY]", "1;32") if is_ready else " " + paint("[WAITING]", "31")
+
+                    print(f"    {i}. {p_name:<18}{host_tag}{status_tag}{you_tag}")
+
+                print("\n  Type 'R' to toggle Ready status | Waiting for host to start...")
                 return
 
             if self.game_module and self.view:
@@ -62,11 +70,11 @@ class ClientSession:
 
             if self.turn_id == self.my_id and self.turn_event.is_set():
                 prompt_str = self.game_module.prompt_for(self.view, self.my_id) if self.game_module else "Enter action"
-                print(paint(f"\n  ▶ YOUR TURN — {prompt_str}:", "1;36"))
+                print(paint(f"\n  ▶ YOUR TURN — {prompt_str} (or '! <msg>' to chat):", "1;36"))
                 self.prompt()
             elif self.turn_id is not None:
                 who = self.turn_name or "another player"
-                print(f"\n  Waiting for {who} to take a turn...")
+                print(f"\n  Waiting for {who} to take a turn... (Type '! <msg>' to chat)")
 
     def show_final(self, message):
         with self.screen_lock:
@@ -93,10 +101,10 @@ class ClientSession:
         elif kind == "joined":
             self.my_id = message.get("player_id")
             self.name = message.get("name", self.name)
-            self.lobby = [self.name]
+            self.lobby_players = [{"name": self.name, "ready": False, "host": False}]
             self.redraw()
         elif kind == "lobby":
-            self.lobby = message.get("names", [])
+            self.lobby_players = message.get("players", message.get("names", []))
             if not self.started:
                 self.redraw()
         elif kind == "start":
@@ -107,7 +115,13 @@ class ClientSession:
             self.view = message.get("view", {})
             self.players = message.get("players", [])
             self.started = True
+            self.over.clear()
             self.log.append("Game started!")
+            self.redraw()
+        elif kind == "rematch":
+            self.over.clear()
+            self.turn_event.clear()
+            self.log.append("🔄 Host started a rematch!")
             self.redraw()
         elif kind == "turn":
             self.turn_id = message.get("player_id")
@@ -127,6 +141,10 @@ class ClientSession:
             if isinstance(events, dict) and "log" in events:
                 for entry in events["log"]:
                     self.log.append(entry)
+            self.redraw()
+        elif kind == "chat":
+            entry = message.get("entry", f"💬 {message.get('sender')}: {message.get('text')}")
+            self.log.append(entry)
             self.redraw()
         elif kind == "notice":
             self.log.append(message.get("message", ""))
@@ -160,6 +178,15 @@ class ClientSession:
             raw = input().strip()
             if self.over.is_set() or not self.turn_event.is_set():
                 return
+
+            if raw.startswith("!"):
+                msg = raw[1:].strip()
+                if msg:
+                    try:
+                        self.send({"type": "chat", "text": msg})
+                    except OSError:
+                        return
+                continue
 
             valid, result_or_err = self.game_module.parse_action(self.view, self.my_id, raw)
             if not valid:

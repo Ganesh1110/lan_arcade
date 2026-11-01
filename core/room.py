@@ -50,6 +50,14 @@ class Room:
                 n += 1
             return f"{name} ({n})"
 
+    def toggle_ready(self, pid):
+        with self.lock:
+            player = self.get_player(pid)
+            if player and not player.is_host:
+                player.is_ready = not player.is_ready
+                return player.is_ready
+            return True
+
     def add_client(self, name, sock):
         with self.lock:
             if self.closed:
@@ -102,6 +110,18 @@ class Room:
         with self.lock:
             return [p.name for p in self.players]
 
+    def lobby_payload(self):
+        with self.lock:
+            return [
+                {
+                    "name": p.name,
+                    "ready": p.is_ready,
+                    "host": p.is_host,
+                    "id": p.player_id
+                }
+                for p in self.players
+            ]
+
     def players_payload(self):
         with self.lock:
             return [p.to_dict() for p in self.players]
@@ -151,11 +171,24 @@ class Room:
 
             names = self.player_names()
             print(f"\n  + {player.name} joined from {where} ({len(names)}/{self.max_players} players: {', '.join(names)})")
-            self.broadcast({"type": "lobby", "names": names})
+            self.broadcast({"type": "lobby", "players": self.lobby_payload()})
 
             for line in reader:
                 message = decode_message(line)
-                if message and message.get("type") == "action":
+                if not message:
+                    continue
+                kind = message.get("type")
+
+                if kind == "ready":
+                    self.toggle_ready(pid)
+                    self.broadcast({"type": "lobby", "players": self.lobby_payload()})
+                elif kind == "chat":
+                    chat_text = str(message.get("text", "")).strip()[:100]
+                    if chat_text:
+                        entry = f"💬 {player.name}: {chat_text}"
+                        self.log.append(entry)
+                        self.broadcast({"type": "chat", "sender": player.name, "text": chat_text, "entry": entry})
+                elif kind == "action":
                     self.incoming_moves.put((pid, message.get("action")))
         except (OSError, ValueError):
             pass
@@ -166,7 +199,7 @@ class Room:
                     if not self.started:
                         names = self.player_names()
                         print(f"\n  - {player.name} left the lobby ({len(names)}/{self.max_players} players).")
-                        self.broadcast({"type": "lobby", "names": names})
+                        self.broadcast({"type": "lobby", "players": self.lobby_payload()})
                     else:
                         text = f"{player.name} left the game."
                         print(f"\n  - {text}")
