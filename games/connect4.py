@@ -153,39 +153,50 @@ def render_dashboard(view):
         ""
     ]
 
-    # Render Board
-    col_headers = "   " + "   ".join(str(c + 1) for c in range(COLS))
-    out.append(col_headers)
-    out.append("  +" + "---+" * COLS)
+    # Arrow indicator and column labels
+    arrows = "    " + "   ".join(paint("▼", "1;36") for _ in range(COLS))
+    col_labels = "   " + " ".join(paint(f"({c + 1})", "1;36") for c in range(COLS))
+    out.append(arrows)
+    out.append(col_labels)
 
+    top_border = "   ╔" + "═══╦" * (COLS - 1) + "═══╗"
+    mid_border = "   ╠" + "═══╬" * (COLS - 1) + "═══╣"
+    bot_border = "   ╚" + "═══╩" * (COLS - 1) + "═══╝"
+
+    out.append(top_border)
     for r in range(ROWS):
-        row_str = [" |"]
+        row_str = ["   ║"]
         for c in range(COLS):
             val = board[r][c]
             if (r, c) in winning_cells:
-                cell_str = paint(f" {val} ", "1;32")
+                cell_str = paint(" ★ ", "1;32;42")
             elif val == "X":
-                cell_str = paint(" X ", "1;31")
+                cell_str = paint(" ● ", "1;31")
             elif val == "O":
-                cell_str = paint(" O ", "1;33")
+                cell_str = paint(" ● ", "1;33")
             else:
-                cell_str = " . "
-            row_str.append(cell_str + "|")
+                cell_str = paint(" · ", "2")
+            row_str.append(cell_str + "║")
         out.append("".join(row_str))
-        out.append("  +" + "---+" * COLS)
+        if r < ROWS - 1:
+            out.append(mid_border)
+        else:
+            out.append(bot_border)
 
     # Players info
     out.append("")
+    out.append("  PLAYERS:")
     for p in players:
         sym = symbols.get(str(p["id"]), symbols.get(p["id"], "?"))
         ptr = paint("▶", "1;36") if p["id"] == turn_id else " "
-        c_sym = paint(f"[{sym}]", "1;31" if sym == "X" else "1;33")
-        out.append(f"  {ptr} {p['name']:<20} {c_sym}")
+        dot = paint("●", "1;31" if sym == "X" else "1;33")
+        c_sym = paint(f"[{sym} {dot}]", "1;31" if sym == "X" else "1;33")
+        out.append(f"   {ptr} {p['name']:<20} {c_sym}")
 
     if log:
         out.append("")
         out.append("  Recent activity:")
-        out.extend("   " + line for line in log)
+        out.extend("   " + line for line in log[-4:])
 
     return "\n".join(out)
 

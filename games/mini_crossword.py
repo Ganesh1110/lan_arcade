@@ -205,7 +205,7 @@ def render_dashboard(view):
 
     out = [
         paint("=" * 56, "1;36"),
-        paint(f"         M I N I   C R O S S W O R D   R A C E", "1;36"),
+        paint("         M I N I   C R O S S W O R D   R A C E", "1;36"),
         paint(f"         Theme: {theme}", "1;33"),
         paint("=" * 56, "1;36"),
         "",
@@ -214,18 +214,24 @@ def render_dashboard(view):
         "  YOUR GRID:"
     ]
 
-    border = "    +" + "---+" * GRID_SIZE
-    out.append(border)
+    top_b = "       ┌───┬───┬───┬───┬───┐"
+    mid_b = "       ├───┼───┼───┼───┼───┤"
+    bot_b = "       └───┴───┴───┴───┴───┘"
+
+    out.append(top_b)
     for r in range(GRID_SIZE):
-        row_str = [f" {r + 1}A |"]
+        row_str = [f"    {r + 1}A │"]
         for c in range(GRID_SIZE):
             val = my_board[r][c]
             if val != ".":
-                row_str.append(paint(f" {val} ", "1;32") + "|")
+                row_str.append(paint(f" {val} ", "1;32") + "│")
             else:
-                row_str.append(" . |")
+                row_str.append(paint(" · ", "2") + "│")
         out.append("".join(row_str))
-        out.append(border)
+        if r < GRID_SIZE - 1:
+            out.append(mid_b)
+        else:
+            out.append(bot_b)
 
     out.append("")
     out.append("  CLUES (ACROSS):")

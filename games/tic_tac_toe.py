@@ -1,6 +1,6 @@
 """
 Tic-Tac-Toe Game Module.
-2-Player Classic 3x3 Grid Game.
+2-Player Classic 3x3 Grid Game with Enhanced Visuals.
 """
 from config import paint
 
@@ -23,6 +23,7 @@ def create_state(player_sessions):
         "symbols": {players[0]["id"]: "X", players[1]["id"]: "O"},
         "turn_index": 0,
         "moves": 0,
+        "winning_line": [],
         "winner": None
     }
 
@@ -40,6 +41,7 @@ def view_for(state, player_id):
         "board": state["board"],
         "players": state["players"],
         "symbols": state["symbols"],
+        "winning_line": state.get("winning_line", []),
         "turn_id": current_player(state),
         "winner": state["winner"]
     }
@@ -74,8 +76,8 @@ def check_win(board, symbol):
     ]
     for a, b, c in lines:
         if board[a] == symbol and board[b] == symbol and board[c] == symbol:
-            return True
-    return False
+            return True, [a, b, c]
+    return False, []
 
 
 def apply_action(state, player_id, cell_idx):
@@ -86,7 +88,9 @@ def apply_action(state, player_id, cell_idx):
     curr_p = next(p for p in state["players"] if p["id"] == player_id)
     log_msg = f"{curr_p['name']} placed {symbol} at position {cell_idx + 1}"
 
-    if check_win(state["board"], symbol):
+    won, line = check_win(state["board"], symbol)
+    if won:
+        state["winning_line"] = line
         state["winner"] = [curr_p["name"]]
         log_msg += " and won!"
 
@@ -114,6 +118,7 @@ def render_dashboard(view):
     players = view.get("players", [])
     symbols = view.get("symbols", {})
     turn_id = view.get("turn_id")
+    winning_line = set(view.get("winning_line", []))
     log = view.get("log", [])
 
     out = [
@@ -125,31 +130,34 @@ def render_dashboard(view):
 
     def cell_char(i):
         v = board[i]
+        if i in winning_line:
+            return paint(f" ★{v}★ ", "1;32;42")
         if v == "X":
-            return paint(" X ", "1;31")
+            return paint("  X  ", "1;31")
         if v == "O":
-            return paint(" O ", "1;33")
-        return paint(f" {i + 1} ", "2")
+            return paint("  O  ", "1;33")
+        return paint(f"  {i + 1}  ", "2;37")
 
-    grid_str = [
-        f"       {cell_char(0)} | {cell_char(1)} | {cell_char(2)}",
-        "      ----+-----+----",
-        f"       {cell_char(3)} | {cell_char(4)} | {cell_char(5)}",
-        "      ----+-----+----",
-        f"       {cell_char(6)} | {cell_char(7)} | {cell_char(8)}"
-    ]
-    out.extend(grid_str)
+    out.append("             ┌─────┬─────┬─────┐")
+    out.append(f"             │{cell_char(0)}│{cell_char(1)}│{cell_char(2)}│")
+    out.append("             ├─────┼─────┼─────┤")
+    out.append(f"             │{cell_char(3)}│{cell_char(4)}│{cell_char(5)}│")
+    out.append("             ├─────┼─────┼─────┤")
+    out.append(f"             │{cell_char(6)}│{cell_char(7)}│{cell_char(8)}│")
+    out.append("             └─────┴─────┴─────┘")
 
     out.append("")
+    out.append("  PLAYERS:")
     for p in players:
         sym = symbols.get(p["id"], "?")
         ptr = paint("▶", "1;36") if p["id"] == turn_id else " "
-        out.append(f"  {ptr} {p['name']:<20} [{sym}]")
+        c_sym = paint(f"[{sym}]", "1;31" if sym == "X" else "1;33")
+        out.append(f"   {ptr} {p['name']:<20} {c_sym}")
 
     if log:
         out.append("")
         out.append("  Recent activity:")
-        out.extend("   " + line for line in log)
+        out.extend("   " + line for line in log[-4:])
 
     return "\n".join(out)
 

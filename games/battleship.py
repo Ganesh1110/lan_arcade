@@ -202,44 +202,52 @@ def render_grid_side_by_side(view):
     opp_shots = parse_shots(opp_shots_raw)
 
     lines = []
-    header = "      YOUR FLEET             TARGET HISTORY"
-    col_sub = "    A B C D E               A B C D E"
-    border  = "  +-----------+           +-----------+"
+    header = "          YOUR FLEET                       RADAR / TARGETS"
+    col_sub = "       A   B   C   D   E                 A   B   C   D   E"
+    top_b = "     ┌───┬───┬───┬───┬───┐"
+    mid_b = "     ├───┼───┼───┼───┼───┤"
+    bot_b = "     └───┴───┴───┴───┴───┘"
 
-    lines.append(header)
+    lines.append(paint(header, "1;36"))
     lines.append(col_sub)
-    lines.append(border)
+    lines.append(f"{top_b}             {top_b.strip()}")
 
     for r in range(GRID_SIZE):
-        # Your Fleet Grid (shows your ships + incoming opp_shots)
+        # Left (own grid + opponent shots)
         left_cells = []
         for c in range(GRID_SIZE):
             if (r, c) in opp_shots:
                 if opp_shots[(r, c)]:
-                    left_cells.append(paint("X", "1;31"))  # Hit on your ship
+                    left_cells.append(paint(" ✕ ", "1;31"))  # Hit on your ship
                 else:
-                    left_cells.append(paint("O", "1;34"))  # Miss by opponent
+                    left_cells.append(paint(" • ", "1;34"))  # Miss by opponent
             elif own_grid[r][c] is not None:
-                left_cells.append(paint("S", "1;32"))     # Your ship
+                left_cells.append(paint(" ■ ", "1;32"))     # Your ship
             else:
-                left_cells.append(".")
+                left_cells.append(paint(" · ", "2"))
 
-        # Target Grid (shows your outgoing my_shots against opponent)
+        # Right (your shots against opponent)
         right_cells = []
         for c in range(GRID_SIZE):
             if (r, c) in my_shots:
                 if my_shots[(r, c)]:
-                    right_cells.append(paint("X", "1;31"))  # Your hit
+                    right_cells.append(paint(" ✕ ", "1;31"))  # Your hit
                 else:
-                    right_cells.append(paint("O", "1;34"))  # Your miss
+                    right_cells.append(paint(" • ", "1;34"))  # Your miss
             else:
-                right_cells.append(".")
+                right_cells.append(paint(" · ", "2"))
 
-        left_str = " ".join(left_cells)
-        right_str = " ".join(right_cells)
-        lines.append(f"{r + 1} | {left_str} |         {r + 1} | {right_str} |")
+        left_str = "│" + "│".join(left_cells) + "│"
+        right_str = "│" + "│".join(right_cells) + "│"
+        lines.append(f"   {r + 1} {left_str}           {r + 1} {right_str}")
 
-    lines.append(border)
+        if r < GRID_SIZE - 1:
+            lines.append(f"{mid_b}             {mid_b.strip()}")
+        else:
+            lines.append(f"{bot_b}             {bot_b.strip()}")
+
+    lines.append("")
+    lines.append("     Legend: " + paint("■", "1;32") + " Ship  " + paint("✕", "1;31") + " Hit  " + paint("•", "1;34") + " Miss  " + paint("·", "2") + " Water")
     return "\n".join(lines)
 
 
@@ -251,15 +259,13 @@ def render_dashboard(view):
     log = view.get("log", [])
 
     out = [
-        paint("=" * 50, "1;36"),
-        paint("               B A T T L E S H I P", "1;36"),
-        paint("=" * 50, "1;36"),
+        paint("=" * 60, "1;36"),
+        paint("                    B A T T L E S H I P", "1;36"),
+        paint("=" * 60, "1;36"),
         "",
-        f"  You: {name}   vs   Opponent: {opp_name}",
+        f"  You: {paint(name, '1;33')}   vs   Opponent: {paint(opp_name, '1;36')}",
         "",
-        render_grid_side_by_side(view),
-        "",
-        "  Legend: " + paint("S", "1;32") + " = Ship   " + paint("X", "1;31") + " = Hit   " + paint("O", "1;34") + " = Miss"
+        render_grid_side_by_side(view)
     ]
 
     if log:

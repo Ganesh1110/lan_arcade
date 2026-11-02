@@ -210,32 +210,34 @@ def render_dashboard(view):
         ""
     ]
 
-    col_hdr = "    " + "   ".join(f"C{c + 1}" for c in range(GRID_SIZE))
-    out.append(col_hdr)
+    col_hdr = "       C1  C2  C3   C4  C5  C6"
+    out.append(paint(col_hdr, "1;36"))
 
-    # 6x6 Sudoku has 2x3 blocks: heavy horizontal border every 2 rows, heavy vertical border after col 3
-    heavy_border = "   +" + "===+" * 3 + "===+" * 3
-    light_border = "   +" + "---+" * 3 + "---+" * 3
-    out.append(heavy_border)
+    top_b = "   ╔═══╤═══╤═══╦═══╤═══╤═══╗"
+    mid_l = "   ╟───┼───┼───╫───┼───┼───╢"
+    mid_h = "   ╠═══╪═══╪═══╬═══╪═══╪═══╣"
+    bot_b = "   ╚═══╧═══╧═══╩═══╧═══╧═══╝"
+
+    out.append(top_b)
 
     for r in range(GRID_SIZE):
         row_cells = []
         for c in range(GRID_SIZE):
             v = grid[r][c]
-            cell = paint(f" {v} ", "1;32") if v else " . "
+            cell = paint(f" {v} ", "1;32") if v else paint(" · ", "2")
             row_cells.append(cell)
 
         # Split into 2 blocks of 3
-        part1 = "|".join(row_cells[:3])
-        part2 = "|".join(row_cells[3:])
-        out.append(f"R{r + 1} |{part1}|{part2}|")
+        part1 = "│".join(row_cells[:3])
+        part2 = "│".join(row_cells[3:])
+        out.append(f"R{r + 1} ║{part1}║{part2}║")
 
         if r == 1 or r == 3:
-            out.append(heavy_border)
+            out.append(mid_h)
         elif r == 5:
-            out.append(heavy_border)
+            out.append(bot_b)
         else:
-            out.append(light_border)
+            out.append(mid_l)
 
     out.append("")
     out.append("  SCOREBOARD:")

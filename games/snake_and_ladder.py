@@ -158,8 +158,8 @@ def _render_board_grid(positions, players):
         pos = positions.get(pid, 1)
         sq_tokens.setdefault(pos, []).append(token)
 
-    rows = []
-    rows.append("  " + "+-----" * 10 + "+")
+    border = "  +" + "-----+" * 10
+    rows = [border]
 
     for r in range(10, 0, -1):
         row_cells = []
@@ -172,9 +172,9 @@ def _render_board_grid(positions, players):
             tokens = sq_tokens.get(sq, [])
             if tokens:
                 cell_str = ",".join(tokens)
-                if len(cell_str) > 3:
-                    cell_str = cell_str[:3]
-                raw_5 = f"[{cell_str}]".center(5)
+                if len(cell_str) > 5:
+                    cell_str = cell_str[:5]
+                raw_5 = f"{cell_str:^5}"
                 formatted = paint(raw_5, "1;33;44")
             elif sq in LADDERS:
                 raw_5 = f"L{LADDERS[sq]}".center(5)
@@ -183,12 +183,12 @@ def _render_board_grid(positions, players):
                 raw_5 = f"S{SNAKES[sq]}".center(5)
                 formatted = paint(raw_5, "1;31")
             else:
-                formatted = f"{sq}".center(5)
+                formatted = f"{sq:^5}"
 
             row_cells.append(formatted)
 
-        rows.append("  | " + " | ".join(row_cells) + " |")
-        rows.append("  " + "+-----" * 10 + "+")
+        rows.append("  |" + "|".join(row_cells) + "|")
+        rows.append(border)
 
     return "\n".join(rows)
 

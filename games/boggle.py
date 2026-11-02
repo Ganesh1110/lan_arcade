@@ -223,22 +223,28 @@ def render_dashboard(view):
     log = view.get("log", [])
 
     out = [
-        paint("=" * 48, "1;36"),
+        paint("=" * 52, "1;36"),
         paint("          B O G G L E   /   W O R D   H U N T", "1;36"),
-        paint("=" * 48, "1;36"),
+        paint("=" * 52, "1;36"),
         "",
         "  4x4 LETTER GRID:"
     ]
 
-    border = "    +" + "---+" * GRID_SIZE
-    out.append(border)
+    top_b = "        ┌─────┬─────┬─────┬─────┐"
+    mid_b = "        ├─────┼─────┼─────┼─────┤"
+    bot_b = "        └─────┴─────┴─────┴─────┘"
+
+    out.append(top_b)
     for r in range(GRID_SIZE):
-        row_str = ["    |"]
+        row_str = ["        │"]
         for c in range(GRID_SIZE):
             ch = grid[r][c] if r < len(grid) and c < len(grid[r]) else "."
-            row_str.append(paint(f" {ch} ", "1;33") + "|")
+            row_str.append(paint(f"  {ch}  ", "1;33") + "│")
         out.append("".join(row_str))
-        out.append(border)
+        if r < GRID_SIZE - 1:
+            out.append(mid_b)
+        else:
+            out.append(bot_b)
 
     out.append("")
     out.append(f"  Your Score: {paint(str(my_score) + ' pts', '1;32')} (Words: {', '.join(my_words) if my_words else 'None'})")

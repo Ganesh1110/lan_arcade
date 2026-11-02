@@ -280,26 +280,32 @@ def render_dashboard(view):
 
     left_header = f"YOUR BOARD ({name})" + (" [LOCKED]" if my_locked else "")
     right_header = f"OPPONENT ({opp_name})" + (" [LOCKED]" if opp_locked else "")
-    out.append(f"  {left_header:<27}        {right_header:<27}")
+    out.append(f"  {paint(left_header, '1;33'):<35}     {paint(right_header, '1;36'):<35}")
     out.append(f"  Score: {my_score:<5} Max: {my_max:<5}              Score: {opp_score:<5} Max: {opp_max:<5}")
 
-    border = "  +" + "-----+-----+-----+-----+"
-    out.append(f"{border}      {border.strip()}")
+    top_b = "  ┌─────┬─────┬─────┬─────┐"
+    mid_b = "  ├─────┼─────┼─────┼─────┤"
+    bot_b = "  └─────┴─────┴─────┴─────┘"
+
+    out.append(f"{top_b}      {top_b.strip()}")
 
     for r in range(GRID_SIZE):
         # My row
         my_cells = [_format_cell(my_board[r][c]) for c in range(GRID_SIZE)]
-        my_row_str = "  |" + "|".join(my_cells) + "|"
+        my_row_str = "  │" + "│".join(my_cells) + "│"
 
         # Opponent row
         if opp_board and len(opp_board) > r:
             opp_cells = [_format_cell(opp_board[r][c]) for c in range(GRID_SIZE)]
-            opp_row_str = "  |" + "|".join(opp_cells) + "|"
+            opp_row_str = "│" + "│".join(opp_cells) + "│"
         else:
-            opp_row_str = "  |  .  |  .  |  .  |  .  |"
+            opp_row_str = "│  .  │  .  │  .  │  .  │"
 
-        out.append(f"{my_row_str}    {opp_row_str.strip()}")
-        out.append(f"{border}      {border.strip()}")
+        out.append(f"{my_row_str}      {opp_row_str}")
+        if r < GRID_SIZE - 1:
+            out.append(f"{mid_b}      {mid_b.strip()}")
+        else:
+            out.append(f"{bot_b}      {bot_b.strip()}")
 
     if log:
         out.append("")

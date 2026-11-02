@@ -175,38 +175,49 @@ def render_dashboard(view):
     log = view.get("log", [])
 
     out = [
-        paint("=" * 48, "1;36"),
-        paint("         D O T S   A N D   B O X E S", "1;36"),
-        paint("=" * 48, "1;36"),
-        ""
+        paint("=" * 52, "1;36"),
+        paint("              D O T S   A N D   B O X E S", "1;36"),
+        paint("=" * 52, "1;36"),
+        "",
+        "           Col 1       Col 2       Col 3"
     ]
 
-    # Render Board
+    dot = paint("●", "1;36")
+    drawn_h = paint("━━━━━━━━━━━", "1;33")
+    empty_h = paint(" · · · · · ", "2")
+
+    drawn_v = paint("┃", "1;33")
+    empty_v = paint(":", "2")
+
     board_lines = []
     for r in range(3):
-        # Dot row + horizontal edges
-        row_str = ["  •"]
+        # Horizontal edge row
+        h_row = [f"  H {r + 1}   {dot}"]
         for c in range(3):
-            edge = paint("---", "1;33") if h[r][c] else "   "
-            row_str.append(edge + "•")
-        board_lines.append("".join(row_str) + f"  (H {r + 1})")
+            h_seg = drawn_h if h[r][c] else empty_h
+            h_row.append(h_seg + dot)
+        board_lines.append("".join(h_row))
 
-        # Vertical edges + boxes
-        v_str = ["  "]
+        # Vertical edge & box row
+        v_row = [f"  V {r + 1}   "]
         for c in range(3):
-            v_edge = paint("|", "1;33") if v[r][c] else " "
-            b_sym = paint(f" {boxes[r][c]} ", "1;32") if boxes[r][c] else "   "
-            v_str.append(v_edge + b_sym)
-        v_edge_last = paint("|", "1;33") if v[r][3] else " "
-        v_str.append(v_edge_last)
-        board_lines.append("".join(v_str) + f"  (V {r + 1})")
+            v_seg = drawn_v if v[r][c] else empty_v
+            b_sym = boxes[r][c]
+            if b_sym:
+                box_str = paint(f"   [{b_sym}]   ", "1;32")
+            else:
+                box_str = paint("   [ ]   ", "2")
+            v_row.append(v_seg + box_str)
+        v_seg_last = drawn_v if v[r][3] else empty_v
+        v_row.append(v_seg_last)
+        board_lines.append("".join(v_row))
 
-    # Final bottom dot row
-    row_str = ["  •"]
+    # Bottom dot row (H 4)
+    h_row = [f"  H 4   {dot}"]
     for c in range(3):
-        edge = paint("---", "1;33") if h[3][c] else "   "
-        row_str.append(edge + "•")
-    board_lines.append("".join(row_str) + "  (H 4)")
+        h_seg = drawn_h if h[3][c] else empty_h
+        h_row.append(h_seg + dot)
+    board_lines.append("".join(h_row))
 
     out.extend(board_lines)
 
@@ -216,12 +227,13 @@ def render_dashboard(view):
         ptr = paint("▶", "1;36") if p["id"] == turn_id else " "
         sym = symbols.get(p["id"], "?")
         score = scores.get(p["id"], 0)
-        out.append(f"   {ptr} {p['name']:<20} [{sym}] Score: {score}")
+        c_sym = paint(f"[{sym}]", "1;32")
+        out.append(f"   {ptr} {p['name']:<20} {c_sym} Score: {paint(str(score) + ' box(es)', '1;33')}")
 
     if log:
         out.append("")
         out.append("  Recent activity:")
-        out.extend("   " + line for line in log)
+        out.extend("   " + line for line in log[-4:])
 
     return "\n".join(out)
 

@@ -52,19 +52,27 @@ def letters_text(letters):
 def render_board(board, called, hot=None):
     called = set(called)
     hot = hot_numbers(board, called) if hot is None else hot
-    border = "   +" + "----+" * 5
-    lines = ["    " + "".join(f"{'C' + str(c):^4} " for c in range(1, 6)), border]
+    top_b = "    ┌────┬────┬────┬────┬────┐"
+    mid_b = "    ├────┼────┼────┼────┼────┤"
+    bot_b = "    └────┴────┴────┴────┴────┘"
+
+    col_hdr = "       C1   C2   C3   C4   C5"
+    lines = [paint(col_hdr, "1;36"), top_b]
+
     for r, row in enumerate(board, 1):
         cells = []
         for n in row:
             if n in called:
-                cells.append(paint("  X ", "1;32"))
+                cells.append(paint(" ✕  ", "1;32"))
             elif n in hot:
-                cells.append(paint(f" {n:>2}*", "1;33"))
+                cells.append(paint(f" {n:>2}★", "1;33"))
             else:
                 cells.append(f" {n:>2} ")
-        lines.append(f"R{r} |" + "|".join(cells) + "|")
-        lines.append(border)
+        lines.append(f" R{r} │" + "│".join(cells) + "│")
+        if r < 5:
+            lines.append(mid_b)
+        else:
+            lines.append(bot_b)
     return "\n".join(lines)
 
 
