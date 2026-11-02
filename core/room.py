@@ -11,6 +11,8 @@ from core.session import PlayerSession
 from protocol import decode_message, encode_message
 from utils.validation import clean_name
 
+SURRENDER_COMMANDS = {"!ff", "!surrender", "!giveup", "!quit", "!exit", "ff", "surrender", "giveup", "quit", "exit", "resign"}
+
 
 class Room:
     def __init__(self, host_name, game_module):
@@ -27,6 +29,7 @@ class Room:
         self.connections = {}      # pid -> socket
         self.send_locks = {}       # pid -> Lock
         self.incoming_moves = queue.Queue()
+        self.surrender_queue = queue.Queue()
 
         self.started = False
         self.closed = False
@@ -182,10 +185,14 @@ class Room:
                 if kind == "ready":
                     self.toggle_ready(pid)
                     self.broadcast({"type": "lobby", "players": self.lobby_payload()})
+                elif kind == "surrender":
+                    self.surrender_queue.put(pid)
                 elif kind == "chat":
                     chat_text = str(message.get("text", "")).strip()[:100]
                     if chat_text:
-                        if chat_text.lower().startswith("!game "):
+                        if chat_text.lower() in SURRENDER_COMMANDS:
+                            self.surrender_queue.put(pid)
+                        elif chat_text.lower().startswith("!game "):
                             g_name = chat_text[6:].strip().lower()
                             from games import GAMES_REGISTRY
                             if g_name in GAMES_REGISTRY:

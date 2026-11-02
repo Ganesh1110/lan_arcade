@@ -70,11 +70,11 @@ class ClientSession:
 
             if self.turn_id == self.my_id and self.turn_event.is_set():
                 prompt_str = self.game_module.prompt_for(self.view, self.my_id) if self.game_module else "Enter action"
-                print(paint(f"\n  ▶ YOUR TURN — {prompt_str} (or '! <msg>' to chat):", "1;36"))
+                print(paint(f"\n  ▶ YOUR TURN — {prompt_str} (or '!ff' to give up, '! <msg>' to chat):", "1;36"))
                 self.prompt()
             elif self.turn_id is not None:
                 who = self.turn_name or "another player"
-                print(f"\n  Waiting for {who} to take a turn... (Type '! <msg>' to chat)")
+                print(f"\n  Waiting for {who} to take a turn... (Type '!ff' to give up, '! <msg>' to chat)")
 
     def show_final(self, message):
         with self.screen_lock:
@@ -185,8 +185,21 @@ class ClientSession:
             if self.over.is_set() or not self.turn_event.is_set():
                 return
 
+            if raw.lower() in {"!ff", "!surrender", "!giveup", "!quit", "!exit", "ff", "surrender", "giveup", "quit", "exit", "resign"}:
+                try:
+                    self.send({"type": "surrender"})
+                except OSError:
+                    return
+                return
+
             if raw.startswith("!"):
                 msg = raw[1:].strip()
+                if msg.lower() in {"ff", "surrender", "giveup", "quit", "exit", "resign"}:
+                    try:
+                        self.send({"type": "surrender"})
+                    except OSError:
+                        return
+                    return
                 if msg:
                     try:
                         self.send({"type": "chat", "text": msg})

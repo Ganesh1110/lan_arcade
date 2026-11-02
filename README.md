@@ -53,6 +53,7 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
   11. **Wordoku** (2 Players) - 6x6 mini Sudoku deduction.
   12. **Anagram Showdown** (2–4 Players) - 7-letter speed anagram solver.
   13. **Snake & Ladders** (2–4 Players) - Classic 1–100 board game with ladders, snakes, dice rolling, extra turn on 6, and exact 100 roll win.
+- **In-Game Forfeit / Surrender & Live Chat**: Any player can type `!ff` / `!surrender` / `!giveup` / `!quit` at any time to forfeit a match, or `! <message>` to chat with room players.
 - **Zero External Dependencies**: Runs entirely on Python 3.9+ standard library.
 
 ---

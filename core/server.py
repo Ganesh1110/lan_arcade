@@ -9,7 +9,7 @@ import time
 from config import DEFAULT_PORT, paint, clear_screen
 from core.exceptions import InvalidMoveError
 from core.game_manager import GameManager
-from core.room import Room
+from core.room import Room, SURRENDER_COMMANDS
 from protocol import decode_message, encode_message
 from utils.network import get_lan_ip
 from utils.validation import clean_name
@@ -27,6 +27,44 @@ class LanTCPServer(socketserver.ThreadingTCPServer):
 class LanRequestHandler(socketserver.BaseRequestHandler):
     def handle(self):
         self.server.room.client_handler(self.request)
+
+
+def handle_surrender(room, gm, surr_pid):
+    surr_p = room.get_player(surr_pid)
+    surr_name = surr_p.name if surr_p else "Player"
+    winners = [p.name for p in room.players if p.player_id != surr_pid and p.is_online]
+    msg = f"🏳️ {surr_name} surrendered the match! Winner(s): {', '.join(winners)}" if winners else f"🏳️ {surr_name} surrendered the match!"
+    room.log.append(f"🏳️ {surr_name} surrendered the match!")
+
+    for p in room.players:
+        if winners and p.name in winners:
+            p.wins += 1
+        elif winners:
+            p.losses += 1
+
+    room.broadcast({
+        "type": "end",
+        "message": msg,
+        "winners": winners,
+        "players": room.players_payload()
+    })
+
+    clear_screen()
+    final_host_view = gm.get_view_for(0)
+    print(room.game_module.render_final(final_host_view, msg, winners))
+
+    print("\n" + paint("=" * 48, "1;36"))
+    print("  1. Rematch (Play Again with same players)")
+    print("  2. Return to Main Menu")
+    print(paint("=" * 48, "1;36"))
+
+    choice = input("\nSelect option [1]: ").strip()
+    if choice == "2":
+        room.broadcast({"type": "end", "message": "Host returned to menu."})
+    else:
+        room.broadcast({"type": "rematch", "message": "Host initiated a rematch!"})
+        time.sleep(0.8)
+        play_lan_host(room)
 
 
 def play_lan_host(room):
@@ -48,6 +86,10 @@ def play_lan_host(room):
             })
 
     while not gm.is_over():
+        if not room.surrender_queue.empty():
+            surr_pid = room.surrender_queue.get()
+            return handle_surrender(room, gm, surr_pid)
+
         # Check if active online players remain
         active_clients = [p for p in room.players if p.player_id == 0 or p.player_id in room.connections]
         if len(active_clients) < room.min_players and len(room.players) > 1:
@@ -90,13 +132,17 @@ def play_lan_host(room):
             # Host's local turn
             prompt_str = gm.get_prompt_for(0)
             while True:
-                raw_in = input(f"\n  ▶ YOUR TURN ({current_player.name}) — {prompt_str} (or '! <msg>' to chat): ").strip()
-                if raw_in.lower() in {"q", "quit"}:
-                    print("Ending game...")
-                    room.broadcast({"type": "end", "message": "Host ended the game."})
-                    return
+                if not room.surrender_queue.empty():
+                    surr_pid = room.surrender_queue.get()
+                    return handle_surrender(room, gm, surr_pid)
+
+                raw_in = input(f"\n  ▶ YOUR TURN ({current_player.name}) — {prompt_str} (or '!ff' to give up, '! <msg>' to chat): ").strip()
+                if raw_in.lower() in SURRENDER_COMMANDS:
+                    return handle_surrender(room, gm, 0)
                 if raw_in.startswith("!"):
                     msg = raw_in[1:].strip()
+                    if msg.lower() in {"ff", "surrender", "giveup", "quit", "exit", "resign"}:
+                        return handle_surrender(room, gm, 0)
                     if msg:
                         entry = f"💬 {current_player.name}: {msg}"
                         room.log.append(entry)
@@ -113,14 +159,25 @@ def play_lan_host(room):
                 print(paint(f"  ! {result_or_err}", "1;31"))
         else:
             # Remote player's turn
-            print(f"\n  Waiting for {current_player.name}... (Ctrl+C to quit host)")
+            print(f"\n  Waiting for {current_player.name}... (Type '!ff' to give up, '! <msg>' to chat)")
             while True:
+                if not room.surrender_queue.empty():
+                    surr_pid = room.surrender_queue.get()
+                    return handle_surrender(room, gm, surr_pid)
+
                 try:
                     pid, raw_act = room.incoming_moves.get(timeout=0.5)
                 except Exception:
                     if current_pid not in room.connections:
                         break
                     continue
+
+                if not room.surrender_queue.empty():
+                    surr_pid = room.surrender_queue.get()
+                    return handle_surrender(room, gm, surr_pid)
+
+                if str(raw_act).strip().lower() in SURRENDER_COMMANDS:
+                    return handle_surrender(room, gm, pid)
 
                 if pid != current_pid:
                     room.send(pid, {"type": "error", "message": "It is not your turn."})
