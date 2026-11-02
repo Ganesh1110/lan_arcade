@@ -39,7 +39,7 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
 - **Host-Authoritative Architecture**: The host machine manages game state, move validation, turn progression, and scoring.
 - **Privacy Enforcement**: Private game information (e.g., secret word in Hangman, hidden fleets in Battleship) is strictly filtered before being sent to individual player clients.
 - **Unified Game Framework**: All games share the same TCP networking, room management, lobby system, and message protocol.
-- **10 Supported Games**:
+- **15 Supported Games**:
   1. **Bingo 1–25** (2–4 Players) - Number calling, complete line detection, solo vs PC mode, local pass-and-play.
   2. **Connect Four** (2 Players) - Classic 6x7 strategy board game.
   3. **Battleship** (2 Players) - Hidden 5x5 grids and coordinate targeting.
@@ -50,6 +50,11 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
   8. **Word Chain / Shiritori** (2–4 Players) - Word association where next word must start with previous word's last letter.
   9. **2048 Versus** (2 Players) - Competitive 4x4 tile-merging race to the 2048 tile.
   10. **Number Duel (High-Low)** (2–4 Players) - Deductive number guessing game between 1 and 100 with higher/lower feedback.
+  11. **Boggle / Word Hunt** (2–4 Players) - 4x4 grid letter search.
+  12. **Mini Crossword Race** (2 Players) - 5x5 speed crossword.
+  13. **Wordoku** (2 Players) - 6x6 mini Sudoku deduction.
+  14. **Anagram Showdown** (2–4 Players) - 7-letter speed anagram solver.
+  15. **Snake & Ladders** (2–4 Players) - Classic 1–100 board game with ladders, snakes, dice rolling, extra turn on 6, and exact 100 roll win.
 - **Zero External Dependencies**: Runs entirely on Python 3.9+ standard library.
 
 ---
@@ -99,6 +104,10 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
 ### 10. Number Duel (High-Low 1–100)
 - **Rules**: Host server picks a secret number between 1 and 100. Take turns guessing. The server narrows the range with `HIGHER ⬆️` or `LOWER ⬇️`. First to guess exact number scores and wins!
 - **Input Format**: Type guess integer between 1 and 100 (e.g. `50` or `75`).
+
+### 11. Snake & Ladders (1–100)
+- **Rules**: Take turns rolling a 6-sided die to advance across a 100-square board. Climb ladders to jump ahead, watch out for snakes sliding you down! Rolling a 6 grants an **extra turn**. First to reach Square 100 (exact roll required) wins!
+- **Input Format**: Press `[ENTER]` or type `r` to roll.
 
 ---
 

@@ -15,6 +15,7 @@ from games import boggle
 from games import mini_crossword
 from games import wordoku
 from games import scrabble_sprint
+from games import snake_and_ladder
 
 GAMES_REGISTRY = {
     bingo.game_id: bingo,
@@ -30,7 +31,8 @@ GAMES_REGISTRY = {
     boggle.game_id: boggle,
     mini_crossword.game_id: mini_crossword,
     wordoku.game_id: wordoku,
-    scrabble_sprint.game_id: scrabble_sprint
+    scrabble_sprint.game_id: scrabble_sprint,
+    snake_and_ladder.game_id: snake_and_ladder
 }
 
 

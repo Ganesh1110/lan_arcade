@@ -3,14 +3,14 @@ from games import (
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
     shiritori, game2048, number_duel,
-    boggle, mini_crossword, wordoku, scrabble_sprint
+    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 )
 
 ALL_GAMES = [
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
     shiritori, game2048, number_duel,
-    boggle, mini_crossword, wordoku, scrabble_sprint
+    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 ]
 
 
@@ -74,6 +74,8 @@ class TestAllGamesContract(unittest.TestCase):
             elif g == scrabble_sprint:
                 rack = g.view_for(state, 0)["rack"]
                 raw_input = "".join(rack[:3])
+            elif g == snake_and_ladder:
+                raw_input = "r"
 
             # Parse action on state
             valid_st, act_st = g.parse_action(state, curr_pid, raw_input)

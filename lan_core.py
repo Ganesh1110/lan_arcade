@@ -15,7 +15,7 @@ from games import (
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
     shiritori, game2048, number_duel,
-    boggle, mini_crossword, wordoku, scrabble_sprint
+    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 )
 
 
@@ -37,6 +37,7 @@ def host_menu():
             f"Mini Crossword Race ({mini_crossword.min_players} players)",
             f"Wordoku Mini Sudoku ({wordoku.min_players} players)",
             f"Anagram Showdown ({scrabble_sprint.min_players}–{scrabble_sprint.max_players} players)",
+            f"Snake & Ladders ({snake_and_ladder.min_players}–{snake_and_ladder.max_players} players)",
             "Back to Main Menu"
         ]
         print(render_menu("HOST A LAN GAME", options))
@@ -85,9 +86,12 @@ def host_menu():
             host_lan_game_session(scrabble_sprint)
             break
         elif choice == "15":
+            host_lan_game_session(snake_and_ladder)
+            break
+        elif choice == "16":
             break
         else:
-            print("Please enter 1–15.")
+            print("Please enter 1–16.")
             input("Press Enter to continue...")
 
 
