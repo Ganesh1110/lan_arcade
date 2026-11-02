@@ -185,9 +185,21 @@ class Room:
                 elif kind == "chat":
                     chat_text = str(message.get("text", "")).strip()[:100]
                     if chat_text:
-                        entry = f"💬 {player.name}: {chat_text}"
-                        self.log.append(entry)
-                        self.broadcast({"type": "chat", "sender": player.name, "text": chat_text, "entry": entry})
+                        if chat_text.lower().startswith("!game "):
+                            g_name = chat_text[6:].strip().lower()
+                            from games import GAMES_REGISTRY
+                            if g_name in GAMES_REGISTRY:
+                                self.game_module = GAMES_REGISTRY[g_name]
+                                self.max_players = self.game_module.max_players
+                                self.min_players = self.game_module.min_players
+                                self.broadcast({"type": "notice", "message": f"🎮 {player.name} selected {self.game_module.game_name}!"})
+                                self.broadcast({"type": "lobby", "players": self.lobby_payload()})
+                        elif chat_text.lower() in {"!start", "s", "start"} and pid in [0, 1]:
+                            self.started = True
+                        else:
+                            entry = f"💬 {player.name}: {chat_text}"
+                            self.log.append(entry)
+                            self.broadcast({"type": "chat", "sender": player.name, "text": chat_text, "entry": entry})
                 elif kind == "action":
                     self.incoming_moves.put((pid, message.get("action")))
         except (OSError, ValueError):
