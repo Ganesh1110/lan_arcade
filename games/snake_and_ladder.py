@@ -172,15 +172,18 @@ def _render_board_grid(positions, players):
             tokens = sq_tokens.get(sq, [])
             if tokens:
                 cell_str = ",".join(tokens)
-                if len(cell_str) > 5:
-                    cell_str = cell_str[:5]
-                formatted = paint(f"{cell_str:^5}", "1;33")
+                if len(cell_str) > 3:
+                    cell_str = cell_str[:3]
+                raw_5 = f"[{cell_str}]".center(5)
+                formatted = paint(raw_5, "1;33;44")
             elif sq in LADDERS:
-                formatted = paint(f"L{LADDERS[sq]:<2}  ", "1;32")
+                raw_5 = f"L{LADDERS[sq]}".center(5)
+                formatted = paint(raw_5, "1;32")
             elif sq in SNAKES:
-                formatted = paint(f"S{SNAKES[sq]:<2}  ", "1;31")
+                raw_5 = f"S{SNAKES[sq]}".center(5)
+                formatted = paint(raw_5, "1;31")
             else:
-                formatted = f"{sq:^5}"
+                formatted = f"{sq}".center(5)
 
             row_cells.append(formatted)
 
