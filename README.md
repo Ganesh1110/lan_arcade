@@ -4,6 +4,36 @@ A modular, terminal-based multiplayer LAN game platform built in Python. Designe
 
 ---
 
+## 🏢 Central Server Deployment (Zero-Installation for Students)
+
+You can host **College LAN Arcade on a single central server** so that students across the entire campus can play **without downloading the repo or installing Python**!
+
+### Method 1: Web Browser Access (`http://<server-ip>:8080`) ⭐ (Easiest for Everyone)
+With Web Terminal (`ttyd`), any student on the college Wi-Fi opens Chrome/Safari on their laptop, tablet, or phone, goes to `http://<server-ip>:8080`, and gets the Arcade menu directly in their browser!
+
+**Deploy via Docker Compose on your Central Server**:
+```bash
+git clone https://github.com/Ganesh1110/lan_arcade.git
+cd lan_arcade
+docker compose up -d
+```
+- Web Arcade URL: `http://<your-server-ip>:8080`
+- Dedicated TCP Arcade Port: `50555`
+
+---
+
+### Method 2: One-Command SSH Access (`ssh arcade@<server-ip>`)
+You can configure a restricted guest SSH user `arcade` on your central server whose default login shell is `python3 lan_core.py`.
+
+Students simply open their terminal and type:
+```bash
+ssh arcade@<your-server-ip>
+```
+Password: `arcade` (or passwordless guest login).
+The arcade menu launches instantly in their terminal with zero repo downloading required!
+
+---
+
 ## 🌟 Features
 
 - **Host-Authoritative Architecture**: The host machine manages game state, move validation, turn progression, and scoring.
@@ -21,35 +51,6 @@ A modular, terminal-based multiplayer LAN game platform built in Python. Designe
   9. **2048 Versus** (2 Players) - Competitive 4x4 tile-merging race to the 2048 tile.
   10. **Number Duel (High-Low)** (2–4 Players) - Deductive number guessing game between 1 and 100 with higher/lower feedback.
 - **Zero External Dependencies**: Runs entirely on Python 3.9+ standard library.
-
----
-
-## 🚀 Quick Start
-
-### 1. Requirements
-- Python 3.9 or higher installed on all devices.
-- All players connected to the same Wi-Fi / Local Area Network (LAN) or Mobile Hotspot.
-
-### 2. Launch the Application
-
-On the **Host** device:
-```bash
-python3 lan_core.py
-```
-1. Select `1. Host a LAN Game`.
-2. Choose your game.
-3. Note the displayed LAN IP address (e.g. `192.168.1.105`) and Port (`50555`).
-4. Share the IP with your friends.
-5. Once your friends join the lobby, press **Enter** to start!
-
-On the **Client** devices (Friends):
-```bash
-python3 lan_core.py
-```
-1. Select `2. Join a LAN Game`.
-2. Enter the Host's IP address and Port.
-3. Choose your player name.
-4. Wait in the lobby for the Host to start the game!
 
 ---
 

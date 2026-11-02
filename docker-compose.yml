@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  # Web Browser Arcade Terminal (Access via http://<server-ip>:8080)
+  arcade-web:
+    build: .
+    container_name: lan_arcade_web
+    command: ttyd -p 8080 -t fontSize=16 -t theme={'background':'#1e1e1e'} python3 /app/lan_core.py
+    network_mode: host
+    restart: always
+
+  # Dedicated TCP Server for Native Terminals (Port 50555)
+  arcade-server:
+    build: .
+    container_name: lan_arcade_server
+    command: python3 lan_core.py --server
+    network_mode: host
+    restart: always
