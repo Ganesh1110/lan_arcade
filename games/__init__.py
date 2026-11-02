@@ -9,7 +9,6 @@ from games import tic_tac_toe
 from games import hangman
 from games import shiritori
 from games import game2048
-from games import number_duel
 from games import boggle
 from games import mini_crossword
 from games import wordoku
@@ -25,7 +24,6 @@ GAMES_REGISTRY = {
     hangman.game_id: hangman,
     shiritori.game_id: shiritori,
     game2048.game_id: game2048,
-    number_duel.game_id: number_duel,
     boggle.game_id: boggle,
     mini_crossword.game_id: mini_crossword,
     wordoku.game_id: wordoku,

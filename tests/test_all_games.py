@@ -2,14 +2,14 @@ import unittest
 from games import (
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman,
-    shiritori, game2048, number_duel,
+    shiritori, game2048,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 )
 
 ALL_GAMES = [
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman,
-    shiritori, game2048, number_duel,
+    shiritori, game2048,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 ]
 
@@ -60,8 +60,6 @@ class TestAllGamesContract(unittest.TestCase):
                 raw_input = "APPLE"
             elif g == game2048:
                 raw_input = "W"
-            elif g == number_duel:
-                raw_input = "50"
             elif g == boggle:
                 # Use a letter combination present on board or valid test input
                 raw_input = g.view_for(state, 0)["grid"][0][0] + g.view_for(state, 0)["grid"][0][1] + g.view_for(state, 0)["grid"][0][2]
