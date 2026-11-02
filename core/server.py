@@ -251,34 +251,101 @@ def play_lan_host(room):
         play_lan_host(room)
 
 
+def render_host_lobby(room, host_ip, port):
+    lines = [
+        paint("=" * 56, "1;36"),
+        paint(f"       LAN {room.game_module.game_name.upper()} HOST LOBBY", "1;36"),
+        paint("=" * 56, "1;36"),
+        "",
+        f"  Host IP address : {paint(host_ip, '1;33')}",
+        f"  Port            : {paint(port, '1;33')}",
+        f"  Required Players: {room.min_players}–{room.max_players} players",
+        "",
+        f"  Connected Players ({len(room.players)}/{room.max_players}):"
+    ]
+    with room.lock:
+        for i, p in enumerate(room.players, 1):
+            host_tag = " " + paint("[HOST]", "1;33") if p.is_host else ""
+            ready_tag = " " + paint("[READY]", "1;32") if p.is_ready else " " + paint("[WAITING]", "31")
+            lines.append(f"    {i}. {p.name:<20}{host_tag}{ready_tag}")
+    lines.append("")
+    lines.append(paint("-" * 56, "2"))
+    lines.append("  Commands:")
+    lines.append("    • Press [ENTER] to start match (once friends join)")
+    lines.append("    • Type 'R' to refresh player list")
+    lines.append("    • Type 'Q' to cancel host and return to menu")
+    lines.append(paint("=" * 56, "1;36"))
+    return "\n".join(lines)
+
+
 def host_lan_game_session(game_module):
-    host_name = clean_name(input("Your player name: "), "Host")
+    clear_screen()
+    print(paint("=" * 56, "1;36"))
+    print(paint(f"         HOST LAN: {game_module.game_name.upper()}", "1;36"))
+    print(paint("=" * 56, "1;36"))
+    print("")
+    raw_name = input("  Enter your player name (or 'q' to cancel): ").strip()
+    if raw_name.lower() in {"q", "quit", "cancel", "back", "exit"}:
+        return
+
+    host_name = clean_name(raw_name, "Host")
     room = Room(host_name, game_module)
-    try:
-        server = LanTCPServer(("0.0.0.0", DEFAULT_PORT), room)
-    except OSError as exc:
-        print(f"Could not start the host on port {DEFAULT_PORT}: {exc}")
-        print("Is another game already hosted on this computer?")
+
+    server = None
+    bound_port = DEFAULT_PORT
+
+    # Attempt to bind to DEFAULT_PORT; if busy, auto-fallback to next open ports
+    for try_port in range(DEFAULT_PORT, DEFAULT_PORT + 20):
+        try:
+            server = LanTCPServer(("0.0.0.0", try_port), room)
+            bound_port = try_port
+            break
+        except OSError:
+            continue
+
+    if server is None:
+        clear_screen()
+        print(paint(f"\n[!] Could not start host on ports {DEFAULT_PORT}–{DEFAULT_PORT + 20}.", "1;31"))
+        print("    Another game server or process is already using these ports.")
+        input("\nPress Enter to return to main menu...")
         return
 
     threading.Thread(target=server.serve_forever, daemon=True).start()
-
-    print("\n" + paint(f"LAN {game_module.game_name.upper()} HOST IS READY", "1;32"))
-    print(f"  Host address : {paint(get_lan_ip(), '1;33')}")
-    print(f"  Port         : {paint(DEFAULT_PORT, '1;33')}")
-    print(f"\nShare IP with friends on same Wi-Fi ({room.min_players}–{room.max_players} players required).")
+    host_ip = get_lan_ip()
 
     try:
         while True:
-            input("\nPress Enter to start the game once everyone has joined...")
+            clear_screen()
+            print(render_host_lobby(room, host_ip, bound_port))
+            if bound_port != DEFAULT_PORT:
+                print(paint(f"\n  Notice: Port {DEFAULT_PORT} was busy; hosted on port {bound_port} instead.", "1;33"))
+                print(f"  Tell players to join with port: {paint(bound_port, '1;33')}")
+
+            cmd = input("\nEnter command [ENTER to start]: ").strip().lower()
+            if cmd in {"q", "quit", "exit", "cancel", "back"}:
+                print("\nHost cancelled lobby. Returning to main menu...")
+                time.sleep(0.5)
+                return
+
+            if cmd in {"r", "refresh"}:
+                continue
+
             with room.lock:
                 if len(room.players) >= room.min_players:
                     room.started = True
                     names = room.player_names()
                     break
-            print(f"Need at least {room.min_players} players to start. Currently {len(room.players)} joined.")
+                else:
+                    curr_cnt = len(room.players)
+                    req_cnt = room.min_players
+                    print(paint(f"\n[!] Need at least {req_cnt} players to start (currently {curr_cnt} joined).", "1;31"))
+                    print(f"    Ask friends to run '2. Join a LAN Game' connecting to {host_ip}:{bound_port}")
+                    input("\nPress Enter to continue waiting...")
 
-        print("\nStarting game! Players: " + " → ".join(names))
+        clear_screen()
+        print("\n" + paint("=" * 56, "1;32"))
+        print(paint("  Starting game! Players: " + " → ".join(names), "1;32"))
+        print(paint("=" * 56, "1;32"))
         time.sleep(1.0)
         play_lan_host(room)
     except KeyboardInterrupt:
@@ -287,8 +354,11 @@ def host_lan_game_session(game_module):
     finally:
         room.closed = True
         time.sleep(0.2)
-        server.shutdown()
-        server.server_close()
+        try:
+            server.shutdown()
+            server.server_close()
+        except Exception:
+            pass
 
 
 def run_dedicated_server(port=DEFAULT_PORT):

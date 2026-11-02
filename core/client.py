@@ -236,9 +236,13 @@ class ClientSession:
 
 
 def join_lan_game():
-    raw = input("Host IP address (or ip:port): ").strip()
-    if not raw:
-        print("Host IP is required.")
+    clear_screen()
+    print(paint("=" * 50, "1;36"))
+    print(paint("              JOIN A LAN GAME", "1;36"))
+    print(paint("=" * 50, "1;36"))
+    print("")
+    raw = input("  Host IP address (or ip:port, 'q' to cancel): ").strip()
+    if not raw or raw.lower() in {"q", "quit", "cancel", "back"}:
         return
     try:
         if ":" in raw:
@@ -246,16 +250,18 @@ def join_lan_game():
             port = int(port_text)
         else:
             host = raw
-            port_raw = input(f"Port [{DEFAULT_PORT}]: ").strip()
+            port_raw = input(f"  Port [{DEFAULT_PORT}]: ").strip()
             port = int(port_raw) if port_raw else DEFAULT_PORT
 
-        name = clean_name(input("Your player name: "), "Guest")
-        print(f"Connecting to {host}:{port} ...")
+        name = clean_name(input("  Your player name: "), "Guest")
+        print(f"\n  Connecting to {host}:{port} ...")
         sock = socket.create_connection((host, port), timeout=10)
         sock.settimeout(None)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     except (OSError, ValueError) as exc:
-        print(f"Could not connect: {exc}")
+        print(paint(f"\n  [!] Could not connect to {raw}: {exc}", "1;31"))
+        print("      Make sure the host game has started and you are on the same Wi-Fi/LAN.")
+        input("\n  Press Enter to return to main menu...")
         return
 
     session = ClientSession(sock, name)
