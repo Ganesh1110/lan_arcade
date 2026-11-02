@@ -8,8 +8,8 @@ A modular, terminal-based multiplayer LAN game platform built in Python. Designe
 
 You can host **College LAN Arcade on a single central server** so that students across the entire campus can play **without downloading the repo or installing Python**!
 
-### Method 1: Web Browser Access (`http://<server-ip>:8080`) ⭐ (Easiest for Everyone)
-With Web Terminal (`ttyd`), any student on the college Wi-Fi opens Chrome/Safari on their laptop, tablet, or phone, goes to `http://<server-ip>:8080`, and gets the Arcade menu directly in their browser!
+### Method 1: Web Browser Access (`http://<server-ip>:8220`) ⭐ (Easiest for Everyone)
+With Web Terminal (`ttyd`), any student on the college Wi-Fi opens Chrome/Safari on their laptop, tablet, or phone, goes to `http://<server-ip>:8220`, and gets the Arcade menu directly in their browser!
 
 **Deploy via Docker Compose on your Central Server**:
 ```bash
@@ -17,7 +17,7 @@ git clone https://github.com/Ganesh1110/lan_arcade.git
 cd lan_arcade
 docker compose up -d
 ```
-- Web Arcade URL: `http://<your-server-ip>:8080`
+- Web Arcade URL: `http://<your-server-ip>:8220`
 - Dedicated TCP Arcade Port: `50555`
 
 ---
