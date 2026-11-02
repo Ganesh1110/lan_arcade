@@ -232,3 +232,27 @@ def host_lan_game_session(game_module):
         time.sleep(0.2)
         server.shutdown()
         server.server_close()
+
+
+def run_dedicated_server(port=DEFAULT_PORT):
+    """Run dedicated office arcade server listening 24/7."""
+    from games import bingo
+    room = Room("OfficeServer", bingo)
+    try:
+        server = LanTCPServer(("0.0.0.0", port), room)
+    except OSError as exc:
+        print(f"Could not start dedicated server on port {port}: {exc}")
+        return
+
+    print("\n" + paint("DEDICATED OFFICE LAN ARCADE SERVER IS RUNNING", "1;32"))
+    print(f"  Server Address : {paint(get_lan_ip(), '1;33')}")
+    print(f"  Listening Port : {paint(port, '1;33')}")
+    print("\nPlayers can connect from their PCs using 'python3 lan_core.py' -> '2. Join a LAN Game'.")
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nDedicated server stopped.")
+    finally:
+        server.shutdown()
+        server.server_close()

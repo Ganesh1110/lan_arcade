@@ -9,5 +9,5 @@ COPY . /app
 # Expose LAN Arcade default TCP port
 EXPOSE 50555
 
-# Run Arcade application
-CMD ["python3", "lan_core.py"]
+# Run Dedicated Arcade Server Mode
+CMD ["python3", "lan_core.py", "--server"]

@@ -119,7 +119,11 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        if "--server" in sys.argv:
+            from core.server import run_dedicated_server
+            run_dedicated_server()
+        else:
+            main()
     except (KeyboardInterrupt, EOFError):
         print("\n\nArcade closed. See you next time!")
         sys.exit(0)
