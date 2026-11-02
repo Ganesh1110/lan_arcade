@@ -1,6 +1,6 @@
 """
 2048 Versus Game Module.
-2-Player Competitive Tile Merging Race.
+2-Player Competitive Tile Merging Race with Side-by-Side Dual Boards.
 """
 import random
 from config import paint
@@ -11,6 +11,7 @@ min_players = 2
 max_players = 2
 
 GRID_SIZE = 4
+WIN_TILE = 2048
 
 
 def spawn_tile(grid):
@@ -27,12 +28,28 @@ def create_initial_grid():
     return grid
 
 
+def can_move(grid):
+    """Check if any legal slide moves exist on the board."""
+    for r in range(GRID_SIZE):
+        for c in range(GRID_SIZE):
+            if grid[r][c] == 0:
+                return True
+            # Right neighbor
+            if c + 1 < GRID_SIZE and grid[r][c] == grid[r][c + 1]:
+                return True
+            # Bottom neighbor
+            if r + 1 < GRID_SIZE and grid[r][c] == grid[r + 1][c]:
+                return True
+    return False
+
+
 def create_state(player_sessions):
     players = []
     boards = {}
     scores = {}
     max_tiles = {}
     moves = {}
+    locked_out = {}
 
     for s in player_sessions:
         pid = s["id"] if isinstance(s, dict) else s.player_id
@@ -42,6 +59,7 @@ def create_state(player_sessions):
         scores[pid] = 0
         max_tiles[pid] = max(max(row) for row in boards[pid])
         moves[pid] = 0
+        locked_out[pid] = False
 
     return {
         "players": players,
@@ -49,6 +67,7 @@ def create_state(player_sessions):
         "scores": scores,
         "max_tiles": max_tiles,
         "moves": moves,
+        "locked_out": locked_out,
         "turn_index": 0,
         "winner": None
     }
@@ -56,6 +75,12 @@ def create_state(player_sessions):
 
 def current_player(state):
     players = state["players"]
+    # If one player is locked out, give turn to remaining unlocked player
+    for offset in range(len(players)):
+        idx = (state["turn_index"] + offset) % len(players)
+        pid = players[idx]["id"]
+        if not state["locked_out"].get(pid, False):
+            return pid
     return players[state["turn_index"] % len(players)]["id"]
 
 
@@ -71,10 +96,13 @@ def view_for(state, player_id):
         "name": p_data["name"] if p_data else "Player",
         "opponent_name": opp["name"] if opp else "Opponent",
         "my_board": my_board,
+        "opp_board": opp_board,
         "my_score": state["scores"].get(player_id, 0),
         "my_max": state["max_tiles"].get(player_id, 2),
         "opp_score": state["scores"].get(opp["id"], 0) if opp else 0,
         "opp_max": state["max_tiles"].get(opp["id"], 2) if opp else 2,
+        "my_locked": state["locked_out"].get(player_id, False),
+        "opp_locked": state["locked_out"].get(opp["id"], False) if opp else False,
         "turn_id": current_player(state),
         "winner": state["winner"]
     }
@@ -92,7 +120,6 @@ def parse_action(state_or_view, player_id, raw_input):
 
 
 def slide_and_merge_line(line):
-    # Slide
     non_zero = [v for v in line if v != 0]
     merged = []
     score_gain = 0
@@ -165,26 +192,50 @@ def apply_action(state, player_id, direction):
         state["max_tiles"][player_id] = max_t
 
         dir_names = {"W": "UP", "A": "LEFT", "S": "DOWN", "D": "RIGHT"}
-        log_entries.append(f"🎮 {curr_p['name']} shifted {dir_names[direction]} (Score: {state['scores'][player_id]}, Max Tile: {max_t})")
+        log_entries.append(
+            f"🎮 {curr_p['name']} shifted {dir_names[direction]} (Score: {state['scores'][player_id]}, Max: {max_t})"
+        )
 
         # Win condition: 2048 tile reached!
-        if max_t >= 2048:
+        if max_t >= WIN_TILE:
             state["winner"] = [curr_p["name"]]
-            log_entries.append(f"🏆 {curr_p['name']} REACHED THE 2048 TILE AND WINS THE RACE!")
+            log_entries.append(f"🏆 {curr_p['name']} REACHED THE {WIN_TILE} TILE AND WINS THE RACE!")
     else:
-        log_entries.append(f"{curr_p['name']} shifted {direction} (No tiles merged/moved).")
+        log_entries.append(f"{curr_p['name']} shifted {direction} (No tiles moved).")
+
+    # Check if this player can make any more moves
+    active_grid = state["boards"][player_id]
+    if not can_move(active_grid):
+        state["locked_out"][player_id] = True
+        log_entries.append(f"🔒 {curr_p['name']}'s board is locked out! No legal moves remaining.")
+
+    # Check if all players are locked out
+    if all(state["locked_out"].values()):
+        max_score = max(state["scores"].values())
+        winners = [p["name"] for p in state["players"] if state["scores"][p["id"]] == max_score]
+        state["winner"] = winners
+        log_entries.append(f"🏁 All boards locked out! Game over! Winner by score: {', '.join(winners)}")
 
     state["turn_index"] += 1
     return {"log": log_entries}
 
 
 def is_over(state):
-    return state["winner"] is not None or any(t >= 2048 for t in state["max_tiles"].values())
+    if state["winner"] is not None:
+        return True
+    if any(t >= WIN_TILE for t in state["max_tiles"].values()):
+        return True
+    if all(state["locked_out"].values()):
+        return True
+    return False
 
 
 def get_winner(state):
     if state["winner"]:
         return state["winner"]
+    if all(state["locked_out"].values()) or is_over(state):
+        max_score = max(state["scores"].values())
+        return [p["name"] for p in state["players"] if state["scores"][p["id"]] == max_score]
     return []
 
 
@@ -193,52 +244,67 @@ def skip_player(state, player_id):
         state["turn_index"] += 1
 
 
+def _format_cell(v):
+    if v == 0:
+        return "  .  "
+    cell = f"{v:^5}"
+    if v >= 1024:
+        return paint(cell, "1;32")
+    elif v >= 128:
+        return paint(cell, "1;33")
+    elif v >= 16:
+        return paint(cell, "1;35")
+    else:
+        return paint(cell, "1;36")
+
+
 def render_dashboard(view):
     name = view.get("name", "Player")
     opp_name = view.get("opponent_name", "Opponent")
     my_board = view.get("my_board", [[0] * GRID_SIZE for _ in range(GRID_SIZE)])
+    opp_board = view.get("opp_board", [[0] * GRID_SIZE for _ in range(GRID_SIZE)])
     my_score = view.get("my_score", 0)
     my_max = view.get("my_max", 2)
     opp_score = view.get("opp_score", 0)
     opp_max = view.get("opp_max", 2)
+    my_locked = view.get("my_locked", False)
+    opp_locked = view.get("opp_locked", False)
     log = view.get("log", [])
 
     out = [
-        paint("=" * 48, "1;36"),
-        paint("               2 0 4 8   V E R S U S", "1;36"),
-        paint("=" * 48, "1;36"),
-        "",
-        f"  You ({name}): Score {my_score} | Max {my_max}   vs   {opp_name}: Score {opp_score} | Max {opp_max}",
-        "",
-        "  YOUR 2048 BOARD:"
+        paint("=" * 60, "1;36"),
+        paint("                  2 0 4 8   V E R S U S", "1;36"),
+        paint("=" * 60, "1;36"),
+        ""
     ]
 
-    border = "  +" + "------+" * GRID_SIZE
-    out.append(border)
+    left_header = f"YOUR BOARD ({name})" + (" [LOCKED]" if my_locked else "")
+    right_header = f"OPPONENT ({opp_name})" + (" [LOCKED]" if opp_locked else "")
+    out.append(f"  {left_header:<27}        {right_header:<27}")
+    out.append(f"  Score: {my_score:<5} Max: {my_max:<5}              Score: {opp_score:<5} Max: {opp_max:<5}")
+
+    border = "  +" + "-----+-----+-----+-----+"
+    out.append(f"{border}      {border.strip()}")
+
     for r in range(GRID_SIZE):
-        row_str = ["  |"]
-        for c in range(GRID_SIZE):
-            v = my_board[r][c]
-            if v == 0:
-                cell = "  .   "
-            else:
-                cell = f"{v:^6}"
-                if v >= 1024:
-                    cell = paint(cell, "1;32")
-                elif v >= 128:
-                    cell = paint(cell, "1;33")
-                elif v >= 16:
-                    cell = paint(cell, "1;35")
-                else:
-                    cell = paint(cell, "1;36")
-            row_str.append(cell + "|")
-        out.append("".join(row_str))
-        out.append(border)
+        # My row
+        my_cells = [_format_cell(my_board[r][c]) for c in range(GRID_SIZE)]
+        my_row_str = "  |" + "|".join(my_cells) + "|"
+
+        # Opponent row
+        if opp_board and len(opp_board) > r:
+            opp_cells = [_format_cell(opp_board[r][c]) for c in range(GRID_SIZE)]
+            opp_row_str = "  |" + "|".join(opp_cells) + "|"
+        else:
+            opp_row_str = "  |  .  |  .  |  .  |  .  |"
+
+        out.append(f"{my_row_str}    {opp_row_str.strip()}")
+        out.append(f"{border}      {border.strip()}")
 
     if log:
         out.append("")
         out.append("  Recent activity:")
-        out.extend("   " + line for line in log)
+        out.extend("   " + line for line in log[-5:])
 
     return "\n".join(out)
 

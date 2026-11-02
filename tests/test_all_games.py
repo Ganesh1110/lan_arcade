@@ -61,15 +61,13 @@ class TestAllGamesContract(unittest.TestCase):
             elif g == game2048:
                 raw_input = "W"
             elif g == boggle:
-                # Use a letter combination present on board or valid test input
-                raw_input = g.view_for(state, 0)["grid"][0][0] + g.view_for(state, 0)["grid"][0][1] + g.view_for(state, 0)["grid"][0][2]
+                raw_input = "pass"
             elif g == mini_crossword:
                 raw_input = "1A APPLE"
             elif g == wordoku:
                 raw_input = "R1 C2 B"
             elif g == scrabble_sprint:
-                rack = g.view_for(state, 0)["rack"]
-                raw_input = "".join(rack[:3])
+                raw_input = "pass"
             elif g == snake_and_ladder:
                 raw_input = "r"
 

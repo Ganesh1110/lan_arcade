@@ -2,6 +2,7 @@
 Wordoku (6x6 Mini Sudoku) Game Module.
 2-Player Competitive Deductive Grid Game.
 """
+import random
 from config import paint
 
 game_id = "wordoku"
@@ -12,24 +13,66 @@ max_players = 2
 GRID_SIZE = 6
 VALID_LETTERS = {"A", "B", "C", "D", "E", "F"}
 
-SOLUTION = [
-    ["A", "B", "C", "D", "E", "F"],
-    ["D", "E", "F", "A", "B", "C"],
-    ["B", "C", "A", "E", "F", "D"],
-    ["E", "F", "D", "B", "C", "A"],
-    ["C", "A", "B", "F", "D", "E"],
-    ["F", "D", "E", "C", "A", "B"]
+PUZZLES = [
+    {
+        "solution": [
+            ["A", "B", "C", "D", "E", "F"],
+            ["D", "E", "F", "A", "B", "C"],
+            ["B", "C", "A", "E", "F", "D"],
+            ["E", "F", "D", "B", "C", "A"],
+            ["C", "A", "B", "F", "D", "E"],
+            ["F", "D", "E", "C", "A", "B"]
+        ],
+        "initial": [
+            ["A", None, "C", None, "E", None],
+            [None, "E", None, "A", None, "C"],
+            ["B", None, None, "E", None, "D"],
+            ["E", None, "D", None, None, "A"],
+            [None, "A", None, "F", None, "E"],
+            [None, "D", None, "C", None, "B"]
+        ]
+    },
+    {
+        "solution": [
+            ["F", "E", "D", "C", "B", "A"],
+            ["C", "B", "A", "F", "E", "D"],
+            ["E", "D", "F", "B", "A", "C"],
+            ["B", "A", "C", "E", "D", "F"],
+            ["D", "F", "E", "A", "C", "B"],
+            ["A", "C", "B", "D", "F", "E"]
+        ],
+        "initial": [
+            [None, "E", None, "C", None, "A"],
+            ["C", None, "A", None, "E", None],
+            [None, "D", None, None, "A", "C"],
+            ["B", "A", None, None, "D", None],
+            [None, "F", None, "A", None, "B"],
+            ["A", None, "B", None, "F", None]
+        ]
+    },
+    {
+        "solution": [
+            ["B", "C", "A", "E", "F", "D"],
+            ["E", "F", "D", "B", "C", "A"],
+            ["A", "B", "C", "D", "E", "F"],
+            ["D", "E", "F", "A", "B", "C"],
+            ["F", "D", "E", "C", "A", "B"],
+            ["C", "A", "B", "F", "D", "E"]
+        ],
+        "initial": [
+            ["B", None, "A", None, "F", None],
+            [None, "F", None, "B", None, "A"],
+            ["A", None, None, "D", None, "F"],
+            ["D", None, "F", None, None, "C"],
+            [None, "D", None, "C", None, "B"],
+            [None, "A", None, "F", None, "E"]
+        ]
+    }
 ]
 
-# Initial puzzle (None means empty)
-INITIAL_PUZZLE = [
-    ["A", None, "C", None, "E", None],
-    [None, "E", None, "A", None, "C"],
-    ["B", None, None, "E", None, "D"],
-    ["E", None, "D", None, None, "A"],
-    [None, "A", None, "F", None, "E"],
-    [None, "D", None, "C", None, "B"]
-]
+# Legacy fallbacks
+SOLUTION = PUZZLES[0]["solution"]
+INITIAL_PUZZLE = PUZZLES[0]["initial"]
 
 
 def create_state(player_sessions):
@@ -41,13 +84,15 @@ def create_state(player_sessions):
         players.append({"id": pid, "name": name})
         scores[pid] = 0
 
-    grid = [row[:] for row in INITIAL_PUZZLE]
+    puzzle = random.choice(PUZZLES)
+    grid = [row[:] for row in puzzle["initial"]]
     empty_cnt = sum(1 for r in range(GRID_SIZE) for c in range(GRID_SIZE) if grid[r][c] is None)
 
     return {
         "players": players,
         "scores": scores,
         "grid": grid,
+        "puzzle": puzzle,
         "empty_count": empty_cnt,
         "turn_index": 0,
         "winner": None
@@ -67,6 +112,7 @@ def view_for(state, player_id):
         "player_id": player_id,
         "name": p_data["name"] if p_data else "Player",
         "opponent_name": opp["name"] if opp else "Opponent",
+        "players": state["players"],
         "grid": state["grid"],
         "scores": state["scores"],
         "empty_count": state["empty_count"],
@@ -108,7 +154,9 @@ def parse_action(state_or_view, player_id, raw_input):
 def apply_action(state, player_id, action):
     curr_p = next(p for p in state["players"] if p["id"] == player_id)
     r, c, val = action["r"], action["c"], action["val"]
-    expected_val = SOLUTION[r][c]
+
+    puzzle = state.get("puzzle", PUZZLES[0])
+    expected_val = puzzle["solution"][r][c]
     log_entries = []
 
     if val == expected_val:
@@ -148,6 +196,7 @@ def skip_player(state, player_id):
 def render_dashboard(view):
     grid = view.get("grid", [[None] * GRID_SIZE for _ in range(GRID_SIZE)])
     scores = view.get("scores", {})
+    players = view.get("players", [])
     empty_cnt = view.get("empty_count", 0)
     turn_id = view.get("turn_id")
     log = view.get("log", [])
@@ -163,21 +212,34 @@ def render_dashboard(view):
 
     col_hdr = "    " + "   ".join(f"C{c + 1}" for c in range(GRID_SIZE))
     out.append(col_hdr)
-    border = "   +" + "---+" * GRID_SIZE
-    out.append(border)
+
+    # 6x6 Sudoku has 2x3 blocks: heavy horizontal border every 2 rows, heavy vertical border after col 3
+    heavy_border = "   +" + "===+" * 3 + "===+" * 3
+    light_border = "   +" + "---+" * 3 + "---+" * 3
+    out.append(heavy_border)
 
     for r in range(GRID_SIZE):
-        row_str = [f"R{r + 1} |"]
+        row_cells = []
         for c in range(GRID_SIZE):
             v = grid[r][c]
             cell = paint(f" {v} ", "1;32") if v else " . "
-            row_str.append(cell + "|")
-        out.append("".join(row_str))
-        out.append(border)
+            row_cells.append(cell)
+
+        # Split into 2 blocks of 3
+        part1 = "|".join(row_cells[:3])
+        part2 = "|".join(row_cells[3:])
+        out.append(f"R{r + 1} |{part1}|{part2}|")
+
+        if r == 1 or r == 3:
+            out.append(heavy_border)
+        elif r == 5:
+            out.append(heavy_border)
+        else:
+            out.append(light_border)
 
     out.append("")
     out.append("  SCOREBOARD:")
-    for p in view.get("players", []):
+    for p in players:
         ptr = paint("▶", "1;36") if p["id"] == turn_id else " "
         sc = scores.get(p["id"], 0)
         out.append(f"   {ptr} {p['name']:<20} Score: {sc} pts")
@@ -185,7 +247,7 @@ def render_dashboard(view):
     if log:
         out.append("")
         out.append("  Recent activity:")
-        out.extend("   " + line for line in log)
+        out.extend("   " + line for line in log[-4:])
 
     return "\n".join(out)
 

@@ -13,9 +13,9 @@ max_players = 2
 
 GRID_SIZE = 5
 SHIPS_CONFIG = [
-    ("Ship A", 3),
-    ("Ship B", 2),
-    ("Ship C", 2)
+    ("Battleship", 3),
+    ("Cruiser", 2),
+    ("Patrol Boat", 2)
 ]
 
 
@@ -151,6 +151,12 @@ def apply_action(state, player_id, coord):
         log_msg = f"💦 {curr_player['name']} attacked {target_str} — MISS."
 
     state["shots"][player_id][(r, c)] = is_hit
+
+    if hit_ship is not None:
+        # Check if this specific ship is completely sunk
+        s_locs = state["ship_locs"][opp_id].get(hit_ship, set())
+        if all(cell in state["shots"][player_id] and state["shots"][player_id][cell] for cell in s_locs):
+            log_msg += f" 💣 {curr_player['name']} SUNK the enemy {hit_ship}!"
 
     # Check if all opponent ship cells are hit
     total_hits = sum(1 for hit in state["shots"][player_id].values() if hit)

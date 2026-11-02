@@ -97,7 +97,7 @@ def create_state(player_sessions):
 
 
 def current_player(state):
-    if state["secret_code"] is None if "secret_code" in state else state["secret_word"] is None:
+    if state.get("secret_word") is None:
         return state["wordmaster_id"]
     return state["guesser_id"]
 
@@ -106,15 +106,23 @@ def view_for(state, player_id):
     p_data = next((p for p in state["players"] if p["id"] == player_id), None)
     is_wordmaster = (player_id == state["wordmaster_id"])
 
-    # PRIVACY ENFORCEMENT: Send secret word ONLY to Wordmaster or when game is over
+    # Word visibility: Wordmaster or Game Over gets the plain word
     word_visible = is_wordmaster or state["winner"] is not None
+
+    secret = state.get("secret_word")
+    word_len = len(secret) if secret else 0
+    revealed_pattern = ""
+    if secret:
+        revealed_pattern = " ".join(ch if ch in state["guessed_letters"] else "_" for ch in secret)
 
     return {
         "player_id": player_id,
         "name": p_data["name"] if p_data else "Player",
         "wordmaster_id": state["wordmaster_id"],
         "guesser_id": state["guesser_id"],
-        "secret_word": state["secret_word"] if word_visible else None,
+        "secret_word": secret if word_visible else None,
+        "word_len": word_len,
+        "revealed_pattern": revealed_pattern,
         "guessed_letters": sorted(list(state["guessed_letters"])),
         "wrong_count": state["wrong_count"],
         "turn_id": current_player(state),
@@ -125,7 +133,7 @@ def view_for(state, player_id):
 def prompt_for(state_or_view, player_id):
     if state_or_view.get("secret_word") is None and player_id == state_or_view.get("wordmaster_id"):
         return "Set secret word/phrase (e.g. 'COMPUTER')"
-    return "Enter a single letter guess (e.g. 'A' or 'E')"
+    return "Enter a single letter guess or full word (e.g. 'A' or 'COMPUTER')"
 
 
 def parse_action(state_or_view, player_id, raw_input):
@@ -140,14 +148,17 @@ def parse_action(state_or_view, player_id, raw_input):
             return False, "Secret word must contain at least 2 letters (A–Z)."
         return True, clean_word
 
-    # Guesser turn
-    if len(text) != 1 or not text.isalpha():
-        return False, "Guess must be a single letter (A–Z)."
+    # Guesser turn: single letter guess or full word guess
+    if not text.isalpha():
+        return False, "Guess must contain only letters (A–Z)."
 
-    guessed = set(state_or_view.get("guessed_letters", []))
-    if text in guessed:
-        return False, f"Letter '{text}' was already guessed! Choose another."
+    if len(text) == 1:
+        guessed = set(state_or_view.get("guessed_letters", []))
+        if text in guessed:
+            return False, f"Letter '{text}' was already guessed! Choose another."
+        return True, text
 
+    # Full word guess
     return True, text
 
 
@@ -161,7 +172,24 @@ def apply_action(state, player_id, action_val):
         log_entries.append(f"🔒 {wm_name} set a secret word ({len(action_val)} letters)! {g_name}'s turn to guess.")
         return {"log": log_entries}
 
-    letter = action_val
+    guess = action_val
+
+    # Guesser made a full word guess
+    if len(guess) > 1:
+        if guess == state["secret_word"]:
+            state["guessed_letters"].update(list(state["secret_word"]))
+            state["winner"] = [g_name]
+            log_entries.append(f"🏆 {g_name} guessed the whole word '{guess}' correctly and WINS!")
+        else:
+            state["wrong_count"] += 1
+            log_entries.append(f"❌ {g_name} guessed '{guess}' — WRONG WORD! ({state['wrong_count']}/{MAX_WRONG} wrong)")
+            if state["wrong_count"] >= MAX_WRONG:
+                state["winner"] = [wm_name]
+                log_entries.append(f"💀 {g_name} ran out of guesses! {wm_name} WINS! Word was '{state['secret_word']}'.")
+        return {"log": log_entries}
+
+    # Guesser made a single letter guess
+    letter = guess
     state["guessed_letters"].add(letter)
 
     if letter in state["secret_word"]:
@@ -174,7 +202,7 @@ def apply_action(state, player_id, action_val):
     word_letters = set(state["secret_word"])
     if word_letters.issubset(state["guessed_letters"]):
         state["winner"] = [g_name]
-        log_entries.append(f"🏆 {g_name} guessed the word '{state['secret_word']}' and WINS!")
+        log_entries.append(f"🏆 {g_name} solved the word '{state['secret_word']}' and WINS!")
     elif state["wrong_count"] >= MAX_WRONG:
         state["winner"] = [wm_name]
         log_entries.append(f"💀 {g_name} ran out of guesses! {wm_name} WINS! Word was '{state['secret_word']}'.")
@@ -198,6 +226,8 @@ def skip_player(state, player_id):
 
 def render_dashboard(view):
     sec_word = view.get("secret_word")
+    pattern = view.get("revealed_pattern", "")
+    word_len = view.get("word_len", 0)
     guessed = set(view.get("guessed_letters", []))
     wrong_cnt = view.get("wrong_count", 0)
     log = view.get("log", [])
@@ -216,9 +246,11 @@ def render_dashboard(view):
     # Render Word Blanks
     if sec_word:
         display_word = " ".join(ch if ch in guessed else "_" for ch in sec_word)
-        out.append("  Word: " + paint(display_word, "1;32"))
+        out.append(f"  Word ({len(sec_word)} letters): " + paint(display_word, "1;32"))
+    elif pattern:
+        out.append(f"  Word ({word_len} letters): " + paint(pattern, "1;32"))
     else:
-        out.append("  Word: " + paint("_ _ _ _ _", "2"))
+        out.append("  Word: " + paint("[ Waiting for Wordmaster to set word... ]", "2"))
 
     guessed_str = " ".join(sorted(list(guessed))) if guessed else "None"
     out.append(f"  Guessed letters: {guessed_str}")

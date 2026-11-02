@@ -1,8 +1,9 @@
 """
 Word Chain / Shiritori Game Module.
-2–4 Player Word Association Game with 3 Lives per player.
+2–4 Player Word Association Game with 3 Lives per player and English Dictionary Validation.
 """
 from config import paint
+from utils.dictionary import is_valid_word
 
 game_id = "shiritori"
 game_name = "Word Chain (Shiritori)"
@@ -68,15 +69,18 @@ def view_for(state, player_id):
 def prompt_for(state_or_view, player_id):
     req = state_or_view.get("required_letter")
     if req:
-        return f"Enter word starting with '{req}'"
-    return "Enter any starting word (min 2 letters)"
+        return f"Enter word starting with '{req}' (or 'pass' to forfeit 1 life)"
+    return "Enter any starting word (min 2 letters, or 'pass')"
 
 
 def parse_action(state_or_view, player_id, raw_input):
-    word = str(raw_input).strip().upper()
-    if not word or not word.isalpha() or len(word) < 2:
-        return False, "Word must contain at least 2 letters (A–Z)."
-    return True, word
+    text = str(raw_input).strip().upper()
+    if text in {"PASS", "SKIP"}:
+        return True, "PASS"
+
+    if not text or not text.isalpha() or len(text) < 2:
+        return False, "Word must contain at least 2 letters (A–Z) or 'pass'."
+    return True, text
 
 
 def apply_action(state, player_id, word):
@@ -87,7 +91,15 @@ def apply_action(state, player_id, word):
     req = state["required_letter"]
     used = state["used_words"]
 
-    if req and not word.startswith(req):
+    if word == "PASS":
+        state["lives"][player_id] -= 1
+        rem = state["lives"][player_id]
+        if rem > 0:
+            log_entries.append(f"🏳️ {p_name} passed the turn → Forfeited 1 Life! ({rem} ❤️ left)")
+        else:
+            log_entries.append(f"💀 {p_name} passed the turn with 0 Lives left! ELIMINATED!")
+        state["turn_index"] += 1
+    elif req and not word.startswith(req):
         state["lives"][player_id] -= 1
         rem = state["lives"][player_id]
         if rem > 0:
@@ -109,6 +121,18 @@ def apply_action(state, player_id, word):
         else:
             log_entries.append(
                 f"💀 {p_name} played '{word}' (Already used word!) → 0 Lives left! ELIMINATED!"
+            )
+        state["turn_index"] += 1
+    elif not is_valid_word(word):
+        state["lives"][player_id] -= 1
+        rem = state["lives"][player_id]
+        if rem > 0:
+            log_entries.append(
+                f"❌ {p_name} played '{word}' (Not in English dictionary!) → Lost 1 Life! ({rem} ❤️ left)"
+            )
+        else:
+            log_entries.append(
+                f"💀 {p_name} played '{word}' (Not in English dictionary!) → 0 Lives left! ELIMINATED!"
             )
         state["turn_index"] += 1
     else:

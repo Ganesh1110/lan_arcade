@@ -1,9 +1,10 @@
 """
 Boggle / Word Hunt Game Module.
-2–4 Player Word Search Grid Game.
+2–4 Player Word Search Grid Game with English Dictionary Validation and Pass Mechanics.
 """
 import random
 from config import paint
+from utils.dictionary import is_valid_word
 
 game_id = "boggle"
 game_name = "Boggle / Word Hunt"
@@ -49,6 +50,7 @@ def create_state(player_sessions):
         "found_words": found_words,
         "scores": scores,
         "all_claimed": set(),
+        "consecutive_passes": 0,
         "turn_index": 0,
         "winner": None
     }
@@ -86,7 +88,7 @@ def view_for(state, player_id):
 
 
 def prompt_for(state_or_view, player_id):
-    return "Find & enter a word from the grid (min 3 letters)"
+    return "Find & enter word from grid (min 3 letters) or 'pass'"
 
 
 def is_word_in_grid(word, grid):
@@ -118,12 +120,19 @@ def is_word_in_grid(word, grid):
 
 
 def parse_action(state_or_view, player_id, raw_input):
-    word = str(raw_input).strip().upper()
+    text = str(raw_input).strip().upper()
+    if text in {"PASS", "SKIP"}:
+        return True, "PASS"
+
+    word = text
     if len(word) < 3:
-        return False, "Word must be at least 3 letters long."
+        return False, "Word must be at least 3 letters long (or 'pass')."
 
     if not word.isalpha():
         return False, "Word must contain only letters."
+
+    if not is_valid_word(word):
+        return False, f"'{word}' is not recognized as a valid English word!"
 
     grid = state_or_view.get("grid", [])
     if grid and not is_word_in_grid(word, grid):
@@ -152,13 +161,29 @@ def calc_score(word):
 
 def apply_action(state, player_id, word):
     curr_p = next(p for p in state["players"] if p["id"] == player_id)
+    log_entries = []
+
+    if word == "PASS":
+        state["consecutive_passes"] = state.get("consecutive_passes", 0) + 1
+        log_entries.append(
+            f"⏩ {curr_p['name']} passed their turn ({state['consecutive_passes']}/{len(state['players'])} passes)."
+        )
+        if state["consecutive_passes"] >= len(state["players"]):
+            max_s = max(state["scores"].values()) if state["scores"] else 0
+            winners = [p["name"] for p in state["players"] if state["scores"][p["id"]] == max_s]
+            state["winner"] = winners
+            log_entries.append(f"🏁 All players passed! Game ended! Winner(s): {', '.join(winners)}.")
+        state["turn_index"] += 1
+        return {"log": log_entries}
+
+    state["consecutive_passes"] = 0
     pts = calc_score(word)
 
     state["found_words"][player_id].add(word)
     state["all_claimed"].add(word)
     state["scores"][player_id] += pts
 
-    log_entries = [f"🔤 {curr_p['name']} found '{word}' (+{pts} pts)! Total: {state['scores'][player_id]} pts."]
+    log_entries.append(f"🔤 {curr_p['name']} found '{word}' (+{pts} pts)! Total: {state['scores'][player_id]} pts.")
 
     # Win condition: First to reach 15 points
     if state["scores"][player_id] >= 15:
@@ -170,7 +195,11 @@ def apply_action(state, player_id, word):
 
 
 def is_over(state):
-    return state["winner"] is not None or any(s >= 15 for s in state["scores"].values())
+    return (
+        state["winner"] is not None
+        or any(s >= 15 for s in state["scores"].values())
+        or state.get("consecutive_passes", 0) >= len(state["players"])
+    )
 
 
 def get_winner(state):
@@ -186,7 +215,7 @@ def skip_player(state, player_id):
 
 
 def render_dashboard(view):
-    grid = view.get("grid", [[". "] * GRID_SIZE for _ in range(GRID_SIZE)])
+    grid = view.get("grid", [["."] * GRID_SIZE for _ in range(GRID_SIZE)])
     my_words = view.get("my_words", [])
     my_score = view.get("my_score", 0)
     summary = view.get("summary", [])
@@ -197,31 +226,32 @@ def render_dashboard(view):
         paint("=" * 48, "1;36"),
         paint("          B O G G L E   /   W O R D   H U N T", "1;36"),
         paint("=" * 48, "1;36"),
-        ""
+        "",
+        "  4x4 LETTER GRID:"
     ]
 
-    # Render Board
-    border = "  +" + "---+" * GRID_SIZE
+    border = "    +" + "---+" * GRID_SIZE
     out.append(border)
     for r in range(GRID_SIZE):
-        row_str = ["  |"]
+        row_str = ["    |"]
         for c in range(GRID_SIZE):
-            row_str.append(paint(f" {grid[r][c]} ", "1;33") + "|")
+            ch = grid[r][c] if r < len(grid) and c < len(grid[r]) else "."
+            row_str.append(paint(f" {ch} ", "1;33") + "|")
         out.append("".join(row_str))
         out.append(border)
 
     out.append("")
-    out.append(f"  Your Words ({len(my_words)}): " + (", ".join(my_words) if my_words else "None"))
+    out.append(f"  Your Score: {paint(str(my_score) + ' pts', '1;32')} (Words: {', '.join(my_words) if my_words else 'None'})")
     out.append("")
-    out.append("  SCOREBOARD (Target: 15 pts):")
+    out.append("  PLAYERS:")
     for p in summary:
         ptr = paint("▶", "1;36") if p["id"] == turn_id else " "
-        out.append(f"   {ptr} {p['name']:<20} Score: {p['score']} pts ({p['count']} words)")
+        out.append(f"   {ptr} {p['name']:<20} {p['score']} pts ({p['count']} words)")
 
     if log:
         out.append("")
         out.append("  Recent activity:")
-        out.extend("   " + line for line in log)
+        out.extend("   " + line for line in log[-4:])
 
     return "\n".join(out)
 

@@ -1,27 +1,32 @@
 """
 Anagram Showdown / Scrabble Sprint Game Module.
-2–4 Player Speed Anagram Race.
+2–4 Player Speed Anagram Race with English Dictionary Validation and Reroll Mechanics.
 """
 import random
 from collections import Counter
 from config import paint
+from utils.dictionary import is_valid_word
 
 game_id = "scrabble_sprint"
 game_name = "Anagram Showdown"
 min_players = 2
 max_players = 4
 
-VOWELS = "AEIOU"
-CONSONANTS = "BCDFGHJKLMNPQRSTVWXYZ"
+SEED_WORDS = [
+    "STREAM", "PLANET", "GARDEN", "MASTER", "SILVER", "SPRING",
+    "CASTLE", "FROZEN", "WINTER", "FOREST", "DETAIL", "LISTEN",
+    "PRINTER", "STUDENT", "CAPTURE", "WEATHER", "NETWORK", "COLLEGE"
+]
+EXTRA_LETTERS = "AEIOURSTLN"
 
 
 def generate_rack():
-    # 3 vowels, 4 consonants
-    v = [random.choice(VOWELS) for _ in range(3)]
-    c = [random.choice(CONSONANTS) for _ in range(4)]
-    rack = v + c
-    random.shuffle(rack)
-    return rack
+    seed = list(random.choice(SEED_WORDS))
+    # Add 1 extra common vowel/consonant to ensure 7-8 letters
+    if len(seed) < 7:
+        seed.append(random.choice(EXTRA_LETTERS))
+    random.shuffle(seed)
+    return seed
 
 
 def create_state(player_sessions):
@@ -42,6 +47,7 @@ def create_state(player_sessions):
         "claimed": claimed,
         "scores": scores,
         "all_claimed": set(),
+        "consecutive_passes": 0,
         "turn_index": 0,
         "winner": None
     }
@@ -78,16 +84,25 @@ def view_for(state, player_id):
 
 
 def prompt_for(state_or_view, player_id):
-    return "Enter anagram word formed from rack letters (min 3 letters)"
+    return "Enter anagram word (min 3 letters), 'pass', or 'reroll'"
 
 
 def parse_action(state_or_view, player_id, raw_input):
-    word = str(raw_input).strip().upper()
+    text = str(raw_input).strip().upper()
+    if text in {"PASS", "SKIP"}:
+        return True, "PASS"
+    if text in {"REROLL", "SWAP"}:
+        return True, "REROLL"
+
+    word = text
     if len(word) < 3:
-        return False, "Word must be at least 3 letters long."
+        return False, "Word must be at least 3 letters long (or 'pass' / 'reroll')."
 
     if not word.isalpha():
         return False, "Word must contain letters only."
+
+    if not is_valid_word(word):
+        return False, f"'{word}' is not recognized as a valid English word!"
 
     rack = state_or_view.get("rack", [])
     rack_counts = Counter(rack)
@@ -117,18 +132,44 @@ def calc_score(word):
         return 6
     if l == 6:
         return 8
-    return 15  # 7-letter anagram bonus!
+    return 15  # 7+ letter anagram bonus!
 
 
-def apply_action(state, player_id, word):
+def apply_action(state, player_id, action):
     curr_p = next(p for p in state["players"] if p["id"] == player_id)
+    log_entries = []
+
+    if action == "PASS":
+        state["consecutive_passes"] = state.get("consecutive_passes", 0) + 1
+        log_entries.append(
+            f"⏩ {curr_p['name']} passed their turn ({state['consecutive_passes']}/{len(state['players'])} passes)."
+        )
+        if state["consecutive_passes"] >= len(state["players"]):
+            max_s = max(state["scores"].values()) if state["scores"] else 0
+            winners = [p["name"] for p in state["players"] if state["scores"][p["id"]] == max_s]
+            state["winner"] = winners
+            log_entries.append(f"🏁 All players passed! Game ended! Winner(s): {', '.join(winners)}.")
+        state["turn_index"] += 1
+        return {"log": log_entries}
+
+    if action == "REROLL":
+        state["rack"] = generate_rack()
+        state["consecutive_passes"] = 0
+        log_entries.append(f"🎲 {curr_p['name']} rerolled the letter rack! New letters drawn.")
+        state["turn_index"] += 1
+        return {"log": log_entries}
+
+    word = action
     pts = calc_score(word)
+    state["consecutive_passes"] = 0
 
     state["claimed"][player_id].add(word)
     state["all_claimed"].add(word)
     state["scores"][player_id] += pts
 
-    log_entries = [f"🔤 {curr_p['name']} submitted anagram '{word}' (+{pts} pts)! Total: {state['scores'][player_id]} pts."]
+    log_entries.append(
+        f"🔤 {curr_p['name']} submitted anagram '{word}' (+{pts} pts)! Total: {state['scores'][player_id]} pts."
+    )
 
     if state["scores"][player_id] >= 20:
         state["winner"] = [curr_p["name"]]
@@ -139,7 +180,11 @@ def apply_action(state, player_id, word):
 
 
 def is_over(state):
-    return state["winner"] is not None or any(s >= 20 for s in state["scores"].values())
+    return (
+        state["winner"] is not None
+        or any(s >= 20 for s in state["scores"].values())
+        or state.get("consecutive_passes", 0) >= len(state["players"])
+    )
 
 
 def get_winner(state):
@@ -180,7 +225,7 @@ def render_dashboard(view):
     if log:
         out.append("")
         out.append("  Recent activity:")
-        out.extend("   " + line for line in log)
+        out.extend("   " + line for line in log[-4:])
 
     return "\n".join(out)
 
