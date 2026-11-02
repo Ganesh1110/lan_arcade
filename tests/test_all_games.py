@@ -1,14 +1,14 @@
 import unittest
 from games import (
     bingo, connect4, battleship,
-    dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
+    dots_and_boxes, tic_tac_toe, hangman,
     shiritori, game2048, number_duel,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 )
 
 ALL_GAMES = [
     bingo, connect4, battleship,
-    dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
+    dots_and_boxes, tic_tac_toe, hangman,
     shiritori, game2048, number_duel,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 ]
@@ -56,8 +56,6 @@ class TestAllGamesContract(unittest.TestCase):
                 raw_input = "5"
             elif g == hangman:
                 raw_input = "COMPUTER"
-            elif g == rock_paper_scissors:
-                raw_input = "R"
             elif g == shiritori:
                 raw_input = "APPLE"
             elif g == game2048:

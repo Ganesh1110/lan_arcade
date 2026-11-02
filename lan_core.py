@@ -13,7 +13,7 @@ from core.renderer import render_menu
 from core.server import host_lan_game_session
 from games import (
     bingo, connect4, battleship,
-    dots_and_boxes, tic_tac_toe, hangman, rock_paper_scissors,
+    dots_and_boxes, tic_tac_toe, hangman,
     shiritori, game2048, number_duel,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 )
@@ -29,7 +29,6 @@ def host_menu():
             f"Dots and Boxes ({dots_and_boxes.min_players}–{dots_and_boxes.max_players} players)",
             f"Tic-Tac-Toe ({tic_tac_toe.min_players} players)",
             f"Hangman ({hangman.min_players} players)",
-            f"Rock, Paper, Scissors ({rock_paper_scissors.min_players} players)",
             f"Word Chain / Shiritori ({shiritori.min_players}–{shiritori.max_players} players)",
             f"2048 Versus ({game2048.min_players} players)",
             f"Number Duel High-Low ({number_duel.min_players}–{number_duel.max_players} players)",
@@ -62,36 +61,33 @@ def host_menu():
             host_lan_game_session(hangman)
             break
         elif choice == "7":
-            host_lan_game_session(rock_paper_scissors)
-            break
-        elif choice == "8":
             host_lan_game_session(shiritori)
             break
-        elif choice == "9":
+        elif choice == "8":
             host_lan_game_session(game2048)
             break
-        elif choice == "10":
+        elif choice == "9":
             host_lan_game_session(number_duel)
             break
-        elif choice == "11":
+        elif choice == "10":
             host_lan_game_session(boggle)
             break
-        elif choice == "12":
+        elif choice == "11":
             host_lan_game_session(mini_crossword)
             break
-        elif choice == "13":
+        elif choice == "12":
             host_lan_game_session(wordoku)
             break
-        elif choice == "14":
+        elif choice == "13":
             host_lan_game_session(scrabble_sprint)
             break
-        elif choice == "15":
+        elif choice == "14":
             host_lan_game_session(snake_and_ladder)
             break
-        elif choice == "16":
+        elif choice == "15":
             break
         else:
-            print("Please enter 1–16.")
+            print("Please enter 1–15.")
             input("Press Enter to continue...")
 
 

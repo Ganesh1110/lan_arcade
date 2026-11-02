@@ -1,6 +1,6 @@
 """
 Word Chain / Shiritori Game Module.
-2–4 Player Word Association Game.
+2–4 Player Word Association Game with 3 Lives per player.
 """
 from config import paint
 
@@ -17,7 +17,7 @@ def create_state(player_sessions):
         pid = s["id"] if isinstance(s, dict) else s.player_id
         name = s["name"] if isinstance(s, dict) else s.name
         players.append({"id": pid, "name": name})
-        lives[pid] = 3  # 3 strikes per player
+        lives[pid] = 3  # 3 lives per player
 
     return {
         "players": players,
@@ -59,6 +59,7 @@ def view_for(state, player_id):
         "last_word": state["last_word"],
         "required_letter": state["required_letter"],
         "used_count": len(state["used_words"]),
+        "used_words": list(state["used_words"]),
         "turn_id": current_player(state),
         "winner": state["winner"]
     }
@@ -75,37 +76,52 @@ def parse_action(state_or_view, player_id, raw_input):
     word = str(raw_input).strip().upper()
     if not word or not word.isalpha() or len(word) < 2:
         return False, "Word must contain at least 2 letters (A–Z)."
-
-    used = state_or_view.get("used_words", set())
-    if isinstance(used, list):
-        used = set(used)
-
-    req = state_or_view.get("required_letter")
-    if req and not word.startswith(req):
-        return False, f"Word MUST start with the letter '{req}'!"
-
-    if word in used:
-        return False, f"The word '{word}' was already used in this match!"
-
     return True, word
 
 
 def apply_action(state, player_id, word):
     curr_p = next(p for p in state["players"] if p["id"] == player_id)
+    p_name = curr_p["name"]
     log_entries = []
 
-    state["used_words"].add(word)
-    state["last_word"] = word
-    state["required_letter"] = word[-1]
+    req = state["required_letter"]
+    used = state["used_words"]
 
-    log_entries.append(f"🔤 {curr_p['name']} played '{word}' → Next word must start with '{word[-1]}'")
+    if req and not word.startswith(req):
+        state["lives"][player_id] -= 1
+        rem = state["lives"][player_id]
+        if rem > 0:
+            log_entries.append(
+                f"❌ {p_name} played '{word}' (Wrong starting letter! Required '{req}') → Lost 1 Life! ({rem} ❤️ left)"
+            )
+        else:
+            log_entries.append(
+                f"💀 {p_name} played '{word}' (Wrong starting letter! Required '{req}') → 0 Lives left! ELIMINATED!"
+            )
+        state["turn_index"] += 1
+    elif word in used:
+        state["lives"][player_id] -= 1
+        rem = state["lives"][player_id]
+        if rem > 0:
+            log_entries.append(
+                f"❌ {p_name} played '{word}' (Already used word!) → Lost 1 Life! ({rem} ❤️ left)"
+            )
+        else:
+            log_entries.append(
+                f"💀 {p_name} played '{word}' (Already used word!) → 0 Lives left! ELIMINATED!"
+            )
+        state["turn_index"] += 1
+    else:
+        state["used_words"].add(word)
+        state["last_word"] = word
+        state["required_letter"] = word[-1]
+        log_entries.append(f"🔤 {p_name} played '{word}' → Next word must start with '{word[-1]}'")
+        state["turn_index"] += 1
 
     actives = active_players(state)
     if len(actives) == 1:
         state["winner"] = [actives[0]["name"]]
         log_entries.append(f"🏆 {actives[0]['name']} is the last surviving player and WINS!")
-    else:
-        state["turn_index"] += 1
 
     return {"log": log_entries}
 
@@ -161,7 +177,7 @@ def render_dashboard(view):
     if log:
         out.append("")
         out.append("  Recent activity:")
-        out.extend("   " + line for line in log)
+        out.extend("   " + line for line in log[-6:])
 
     return "\n".join(out)
 

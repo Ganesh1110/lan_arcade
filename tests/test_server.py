@@ -9,14 +9,14 @@ from core.room import Room
 from core.server import LanTCPServer
 from games import (
     connect4, bingo, hangman, battleship,
-    rock_paper_scissors, shiritori, game2048, number_duel,
+    shiritori, game2048, number_duel,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
 )
 
 
 class TestServerInit(unittest.TestCase):
     def test_room_initialization(self):
-        for g in [bingo, connect4, hangman, battleship, rock_paper_scissors, shiritori, game2048, number_duel, boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder]:
+        for g in [bingo, connect4, hangman, battleship, shiritori, game2048, number_duel, boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder]:
             room = Room("TestHost", g)
             self.assertEqual(len(room.players), 1)
             self.assertEqual(room.players[0].name, "TestHost")
@@ -60,8 +60,8 @@ class TestServerInit(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+            thread.join(timeout=1.0)
             sys.stdout.flush()
-            time.sleep(0.1)
 
 
 if __name__ == "__main__":

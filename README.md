@@ -39,22 +39,21 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
 - **Host-Authoritative Architecture**: The host machine manages game state, move validation, turn progression, and scoring.
 - **Privacy Enforcement**: Private game information (e.g., secret word in Hangman, hidden fleets in Battleship) is strictly filtered before being sent to individual player clients.
 - **Unified Game Framework**: All games share the same TCP networking, room management, lobby system, and message protocol.
-- **15 Supported Games**:
+- **14 Supported Games**:
   1. **Bingo 1–25** (2–4 Players) - Number calling, complete line detection, solo vs PC mode, local pass-and-play.
   2. **Connect Four** (2 Players) - Classic 6x7 strategy board game.
   3. **Battleship** (2 Players) - Hidden 5x5 grids and coordinate targeting.
   4. **Dots and Boxes** (2–4 Players) - Connect grid dots to claim boxes and earn extra turns.
   5. **Tic-Tac-Toe** (2 Players) - Classic 3x3 strategy grid game.
   6. **Hangman** (2 Players) - Word Master sets secret phrase; Guesser tries to guess letters with visual gallows.
-  7. **Rock, Paper, Scissors** (2 Players) - Simultaneous choice Best-of-3 match.
-  8. **Word Chain / Shiritori** (2–4 Players) - Word association where next word must start with previous word's last letter.
-  9. **2048 Versus** (2 Players) - Competitive 4x4 tile-merging race to the 2048 tile.
-  10. **Number Duel (High-Low)** (2–4 Players) - Deductive number guessing game between 1 and 100 with higher/lower feedback.
-  11. **Boggle / Word Hunt** (2–4 Players) - 4x4 grid letter search.
-  12. **Mini Crossword Race** (2 Players) - 5x5 speed crossword.
-  13. **Wordoku** (2 Players) - 6x6 mini Sudoku deduction.
-  14. **Anagram Showdown** (2–4 Players) - 7-letter speed anagram solver.
-  15. **Snake & Ladders** (2–4 Players) - Classic 1–100 board game with ladders, snakes, dice rolling, extra turn on 6, and exact 100 roll win.
+  7. **Word Chain / Shiritori** (2–4 Players) - Word association with 3 lives per player.
+  8. **2048 Versus** (2 Players) - Competitive 4x4 tile-merging race to the 2048 tile.
+  9. **Number Duel (High-Low)** (2–4 Players) - Deductive number guessing game between 1 and 100.
+  10. **Boggle / Word Hunt** (2–4 Players) - 4x4 grid letter search.
+  11. **Mini Crossword Race** (2 Players) - 5x5 speed crossword.
+  12. **Wordoku** (2 Players) - 6x6 mini Sudoku deduction.
+  13. **Anagram Showdown** (2–4 Players) - 7-letter speed anagram solver.
+  14. **Snake & Ladders** (2–4 Players) - Classic 1–100 board game with ladders, snakes, dice rolling, extra turn on 6, and exact 100 roll win.
 - **Zero External Dependencies**: Runs entirely on Python 3.9+ standard library.
 
 ---
@@ -89,23 +88,19 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
   - Setting Word: `COMPUTER`
   - Guessing Letter: `E` or `A`
 
-### 7. Rock, Paper, Scissors (Best of 3)
-- **Rules**: Both players submit secret moves (`R` for Rock, `P` for Paper, `S` for Scissors). Moves reveal simultaneously. First player to 2 round wins wins the match!
-- **Input Format**: `R` (Rock), `P` (Paper), or `S` (Scissors).
-
-### 8. Word Chain (Shiritori)
-- **Rules**: Type a word starting with the last letter of the previous player's word (e.g., `APPLE` $\rightarrow$ `ELEPHANT` $\rightarrow$ `TIGER`). Duplicates are forbidden!
+### 7. Word Chain (Shiritori)
+- **Rules**: Type a word starting with the last letter of the previous player's word (e.g., `APPLE` $\rightarrow$ `ELEPHANT` $\rightarrow$ `TIGER`). Entering a wrong starting letter or duplicate word deducts 1 life (`❤️`). Last surviving player wins!
 - **Input Format**: Type a valid word (e.g. `ELEPHANT` or `TIGER`).
 
-### 9. 2048 Versus
+### 8. 2048 Versus
 - **Rules**: Shift 4x4 tiles in direction `W` (Up), `A` (Left), `S` (Down), or `D` (Right). Equal tiles merge and double! First player to reach 2048 tile (or highest score) wins!
 - **Input Format**: `W`, `A`, `S`, or `D`.
 
-### 10. Number Duel (High-Low 1–100)
+### 9. Number Duel (High-Low 1–100)
 - **Rules**: Host server picks a secret number between 1 and 100. Take turns guessing. The server narrows the range with `HIGHER ⬆️` or `LOWER ⬇️`. First to guess exact number scores and wins!
 - **Input Format**: Type guess integer between 1 and 100 (e.g. `50` or `75`).
 
-### 11. Snake & Ladders (1–100)
+### 10. Snake & Ladders (1–100)
 - **Rules**: Take turns rolling a 6-sided die to advance across a 100-square board. Climb ladders to jump ahead, watch out for snakes sliding you down! Rolling a 6 grants an **extra turn**. First to reach Square 100 (exact roll required) wins!
 - **Input Format**: Press `[ENTER]` or type `r` to roll.
 
