@@ -9,8 +9,8 @@ WORKDIR /app
 # Copy project files
 COPY . /app
 
-# Expose Web Browser port (8080) and Arcade TCP port (50555)
-EXPOSE 8080 50555
+# Expose Web Browser port (8081) and Arcade TCP port (50555)
+EXPOSE 8081 50555
 
 # Default Command
 CMD ["python3", "lan_core.py", "--server"]
