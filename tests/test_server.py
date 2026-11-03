@@ -10,13 +10,18 @@ from core.server import LanTCPServer
 from games import (
     connect4, bingo, hangman, battleship,
     shiritori, game2048,
-    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
+    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
+    chess_game, wordle, quiz_show, typing_racer
 )
 
 
 class TestServerInit(unittest.TestCase):
     def test_room_initialization(self):
-        for g in [bingo, connect4, hangman, battleship, shiritori, game2048, boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder]:
+        for g in [
+            bingo, connect4, hangman, battleship, shiritori, game2048,
+            boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
+            chess_game, wordle, quiz_show, typing_racer
+        ]:
             room = Room("TestHost", g)
             self.assertEqual(len(room.players), 1)
             self.assertEqual(room.players[0].name, "TestHost")

@@ -5,7 +5,10 @@ Allows single players to enjoy games against intelligent bots or in high-score c
 import random
 import time
 from config import clear_screen, paint, play_sound
-from games import connect4, tic_tac_toe, battleship, snake_and_ladder, game2048, shiritori
+from games import (
+    connect4, tic_tac_toe, battleship, snake_and_ladder, game2048, shiritori,
+    wordle, quiz_show, typing_racer
+)
 from utils.dictionary import get_words_set
 from utils.stats import record_high_score, record_match_outcome
 from utils.validation import clean_name
@@ -410,3 +413,132 @@ def run_shiritori_vs_ai():
     play_sound("win")
     record_match_outcome("Word Chain (vs Bot)", [name, "LexiconBot 📚"], winners)
     input("\nPress Enter to return to solo menu...")
+
+
+# ==========================================
+# 7. SOLO WORDLE PRACTICE
+# ==========================================
+def run_solo_wordle():
+    clear_screen()
+    print(paint("=" * 50, "1;36"))
+    print(paint("           SOLO WORDLE CHALLENGE", "1;36"))
+    print(paint("=" * 50, "1;36"))
+    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
+
+    state = wordle.create_state([{"id": 0, "name": name}, {"id": 1, "name": "Solo Bot"}])
+
+    while not wordle.is_over(state):
+        clear_screen()
+        v = wordle.view_for(state, 0)
+        print(wordle.render_dashboard(v))
+
+        play_sound("turn")
+        raw = input("\n  ▶ Enter 5-letter word (or 'q' to quit): ").strip()
+        if raw.lower() in {"q", "quit", "exit"}:
+            return
+
+        valid, word = wordle.parse_action(state, 0, raw)
+        if valid:
+            wordle.apply_action(state, 0, word)
+        else:
+            print(paint(f"  ! {word}", "1;31"))
+            time.sleep(1.2)
+
+    clear_screen()
+    v = wordle.view_for(state, 0)
+    winners = wordle.get_winner(state)
+    target = state["target_word"]
+    if state["solved"].get(0, False):
+        msg = f"🎉 Congratulations {name}! You cracked the word '{target}'!"
+        play_sound("win")
+        tries = len(state["guesses"].get(0, []))
+        record_high_score("wordle", name, 7 - tries, f"Solved in {tries} tries")
+    else:
+        msg = f"💀 Out of attempts! The secret word was '{target}'."
+    print(wordle.render_final(v, msg, winners))
+    input("\nPress Enter to return to solo menu...")
+
+
+# ==========================================
+# 8. SOLO TRIVIA QUIZ CHALLENGE
+# ==========================================
+def run_solo_quiz_show():
+    clear_screen()
+    print(paint("=" * 50, "1;36"))
+    print(paint("         SOLO COLLEGE TRIVIA QUIZ", "1;36"))
+    print(paint("=" * 50, "1;36"))
+    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
+
+    state = quiz_show.create_state([{"id": 0, "name": name}, {"id": 1, "name": "QuizBot"}])
+
+    while not quiz_show.is_over(state):
+        clear_screen()
+        v = quiz_show.view_for(state, 0)
+        print(quiz_show.render_dashboard(v))
+
+        play_sound("turn")
+        raw = input("\n  ▶ Your Answer (A, B, C, D or 'q' to quit): ").strip()
+        if raw.lower() in {"q", "quit", "exit"}:
+            return
+
+        valid, choice = quiz_show.parse_action(state, 0, raw)
+        if valid:
+            quiz_show.apply_action(state, 0, choice)
+            # Advance bot answer automatically
+            if not quiz_show.is_over(state):
+                bot_choice = random.choice(["A", "B", "C", "D"])
+                quiz_show.apply_action(state, 1, bot_choice)
+        else:
+            print(paint(f"  ! {choice}", "1;31"))
+            time.sleep(1.0)
+
+    clear_screen()
+    v = quiz_show.view_for(state, 0)
+    winners = quiz_show.get_winner(state)
+    my_sc = state["scores"].get(0, 0)
+    msg = f"Quiz Finished! Your Final Score: {my_sc} points."
+    print(quiz_show.render_final(v, msg, winners))
+    play_sound("win")
+    record_high_score("quiz_show", name, my_sc, f"{my_sc} pts")
+    input("\nPress Enter to return to solo menu...")
+
+
+# ==========================================
+# 9. SOLO TYPING RACER VS SPEEDY BOT
+# ==========================================
+def run_solo_typing_racer():
+    clear_screen()
+    print(paint("=" * 50, "1;36"))
+    print(paint("       TYPING RACER VS SPEEDY BOT 🏎️", "1;36"))
+    print(paint("=" * 50, "1;36"))
+    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
+
+    state = typing_racer.create_state([{"id": 0, "name": name}, {"id": 1, "name": "SpeedyBot 🏎️"}])
+
+    while not typing_racer.is_over(state):
+        curr_id = typing_racer.current_player(state)
+        clear_screen()
+        v = typing_racer.view_for(state, 0)
+        print(typing_racer.render_dashboard(v))
+
+        if curr_id == 0:
+            play_sound("turn")
+            raw = input("\n  ▶ Type snippet above (or 'q' to quit): ").strip()
+            if raw.lower() in {"q", "quit", "exit"}:
+                return
+            typing_racer.apply_action(state, 0, raw)
+        else:
+            time.sleep(0.5)
+            # Bot types snippet with minor realistic delay/accuracy
+            snip = typing_racer.TARGET_SNIPPETS[state.get("snippet_index", 0) % len(typing_racer.TARGET_SNIPPETS)]
+            typing_racer.apply_action(state, 1, snip)
+
+    clear_screen()
+    v = typing_racer.view_for(state, 0)
+    winners = typing_racer.get_winner(state)
+    msg = f"Grand Prix Winner: {', '.join(winners)}!"
+    print(typing_racer.render_final(v, msg, winners))
+    play_sound("win")
+    record_match_outcome("Typing Racer (vs Bot)", [name, "SpeedyBot 🏎️"], winners)
+    input("\nPress Enter to return to solo menu...")
+

@@ -3,14 +3,16 @@ from games import (
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman,
     shiritori, game2048,
-    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
+    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
+    chess_game, wordle, quiz_show, typing_racer
 )
 
 ALL_GAMES = [
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman,
     shiritori, game2048,
-    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
+    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
+    chess_game, wordle, quiz_show, typing_racer
 ]
 
 
@@ -78,6 +80,14 @@ class TestAllGamesContract(unittest.TestCase):
                 raw_input = "pass"
             elif g == snake_and_ladder:
                 raw_input = "r"
+            elif g == chess_game:
+                raw_input = "e2e4"
+            elif g == wordle:
+                raw_input = "CRANE"
+            elif g == quiz_show:
+                raw_input = "B"
+            elif g == typing_racer:
+                raw_input = "test"
 
             # Parse action on state
             valid_st, act_st = g.parse_action(state, curr_pid, raw_input)

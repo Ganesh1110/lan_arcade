@@ -19,14 +19,18 @@ from core.solo_modes import (
     run_battleship_vs_ai,
     run_tic_tac_toe_vs_ai,
     run_snake_and_ladder_vs_ai,
-    run_shiritori_vs_ai
+    run_shiritori_vs_ai,
+    run_solo_wordle,
+    run_solo_quiz_show,
+    run_solo_typing_racer
 )
 from utils.stats import render_hall_of_fame
 from games import (
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman,
     shiritori, game2048,
-    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder
+    boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
+    chess_game, wordle, quiz_show, typing_racer
 )
 
 
@@ -47,6 +51,10 @@ def host_menu():
             f"Wordoku Mini Sudoku ({wordoku.min_players} players)",
             f"Anagram Showdown ({scrabble_sprint.min_players}–{scrabble_sprint.max_players} players)",
             f"Snake & Ladders ({snake_and_ladder.min_players}–{snake_and_ladder.max_players} players)",
+            f"Chess ({chess_game.min_players} players)",
+            f"Wordle Versus ({wordle.min_players} players)",
+            f"College Quiz Show ({quiz_show.min_players}–{quiz_show.max_players} players)",
+            f"Typing Racer ({typing_racer.min_players}–{typing_racer.max_players} players)",
             "Back to Main Menu"
         ]
         print(render_menu("HOST A LAN GAME", options))
@@ -92,9 +100,21 @@ def host_menu():
             host_lan_game_session(snake_and_ladder)
             break
         elif choice == "14":
+            host_lan_game_session(chess_game)
+            break
+        elif choice == "15":
+            host_lan_game_session(wordle)
+            break
+        elif choice == "16":
+            host_lan_game_session(quiz_show)
+            break
+        elif choice == "17":
+            host_lan_game_session(typing_racer)
+            break
+        elif choice == "18" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–14.")
+            print("Please enter 1–18.")
             input("Press Enter to continue...")
 
 
@@ -109,6 +129,9 @@ def solo_menu():
             "Tic-Tac-Toe (vs Optimal AI)",
             "Snake & Ladders (vs Dice Bot)",
             "Word Chain / Shiritori (vs Lexicon Bot)",
+            "Wordle (Solo 6-Attempt Challenge)",
+            "College Quiz Show (Solo Trivia Challenge)",
+            "Typing Racer (vs Speedy Bot 🏎️)",
             "Back to Main Menu"
         ]
         print(render_menu("SOLO & OFFLINE ARCADE", options))
@@ -128,10 +151,16 @@ def solo_menu():
             run_snake_and_ladder_vs_ai()
         elif choice == "7":
             run_shiritori_vs_ai()
-        elif choice == "8" or choice.lower() in {"q", "back", "exit"}:
+        elif choice == "8":
+            run_solo_wordle()
+        elif choice == "9":
+            run_solo_quiz_show()
+        elif choice == "10":
+            run_solo_typing_racer()
+        elif choice == "11" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–8.")
+            print("Please enter 1–11.")
             input("Press Enter to continue...")
 
 

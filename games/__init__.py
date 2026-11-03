@@ -14,6 +14,10 @@ from games import mini_crossword
 from games import wordoku
 from games import scrabble_sprint
 from games import snake_and_ladder
+from games import chess_game
+from games import wordle
+from games import quiz_show
+from games import typing_racer
 
 GAMES_REGISTRY = {
     bingo.game_id: bingo,
@@ -28,7 +32,11 @@ GAMES_REGISTRY = {
     mini_crossword.game_id: mini_crossword,
     wordoku.game_id: wordoku,
     scrabble_sprint.game_id: scrabble_sprint,
-    snake_and_ladder.game_id: snake_and_ladder
+    snake_and_ladder.game_id: snake_and_ladder,
+    chess_game.game_id: chess_game,
+    wordle.game_id: wordle,
+    quiz_show.game_id: quiz_show,
+    typing_racer.game_id: typing_racer
 }
 
 
