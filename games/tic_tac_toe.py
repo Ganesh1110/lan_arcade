@@ -116,7 +116,8 @@ def skip_player(state, player_id):
 def render_dashboard(view):
     board = view.get("board", [None] * 9)
     players = view.get("players", [])
-    symbols = view.get("symbols", {})
+    raw_symbols = view.get("symbols", {})
+    symbols = {int(k): v for k, v in raw_symbols.items()} if isinstance(raw_symbols, dict) else {}
     turn_id = view.get("turn_id")
     winning_line = set(view.get("winning_line", []))
     log = view.get("log", [])

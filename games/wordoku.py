@@ -195,7 +195,8 @@ def skip_player(state, player_id):
 
 def render_dashboard(view):
     grid = view.get("grid", [[None] * GRID_SIZE for _ in range(GRID_SIZE)])
-    scores = view.get("scores", {})
+    raw_scores = view.get("scores", {})
+    scores = {int(k): v for k, v in raw_scores.items()} if isinstance(raw_scores, dict) else {}
     players = view.get("players", [])
     empty_cnt = view.get("empty_count", 0)
     turn_id = view.get("turn_id")

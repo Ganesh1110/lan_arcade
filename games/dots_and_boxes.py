@@ -166,8 +166,10 @@ def skip_player(state, player_id):
 
 def render_dashboard(view):
     players = view.get("players", [])
-    scores = view.get("scores", {})
-    symbols = view.get("symbols", {})
+    raw_scores = view.get("scores", {})
+    scores = {int(k): v for k, v in raw_scores.items()} if isinstance(raw_scores, dict) else {}
+    raw_symbols = view.get("symbols", {})
+    symbols = {int(k): v for k, v in raw_symbols.items()} if isinstance(raw_symbols, dict) else {}
     h = view.get("h_edges", [[False] * 3 for _ in range(4)])
     v = view.get("v_edges", [[False] * 4 for _ in range(3)])
     boxes = view.get("boxes", [[None] * 3 for _ in range(3)])
