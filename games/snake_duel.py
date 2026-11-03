@@ -9,6 +9,8 @@ game_id = "snake_duel"
 game_name = "Snake Duel"
 min_players = 2
 max_players = 2
+turn_timeout = 6
+direct_input = True
 
 ARENA_WIDTH = 30
 ARENA_HEIGHT = 14
@@ -275,12 +277,17 @@ def _render_arena(positions, directions, trails, alive, pellet, players):
 
 def render_dashboard(view):
     players = view.get("players", [])
-    positions = view.get("positions", {})
-    directions = view.get("directions", {})
-    trails = view.get("trails", {})
-    alive = view.get("alive", {})
-    lengths = view.get("lengths", {})
-    pellet = view.get("pellet")
+    raw_pos = view.get("positions", {})
+    positions = {int(k): tuple(v) for k, v in raw_pos.items()} if isinstance(raw_pos, dict) else {}
+    raw_dirs = view.get("directions", {})
+    directions = {int(k): tuple(v) for k, v in raw_dirs.items()} if isinstance(raw_dirs, dict) else {}
+    raw_trails = view.get("trails", {})
+    trails = {int(k): [tuple(c) for c in v] for k, v in raw_trails.items()} if isinstance(raw_trails, dict) else {}
+    raw_alive = view.get("alive", {})
+    alive = {int(k): v for k, v in raw_alive.items()} if isinstance(raw_alive, dict) else {}
+    raw_len = view.get("lengths", {})
+    lengths = {int(k): v for k, v in raw_len.items()} if isinstance(raw_len, dict) else {}
+    pellet = tuple(view["pellet"]) if view.get("pellet") else None
     turn_id = view.get("turn_id")
     my_id = view.get("player_id")
     log = view.get("log", [])
@@ -306,11 +313,10 @@ def render_dashboard(view):
     out.append(_render_arena(positions, directions, trails, alive, pellet, players))
     out.append("")
 
-    out.append("  Controls: " + paint("W", "1;33") + "=Up  " +
-               paint("A", "1;33") + "=Left  " +
-               paint("S", "1;33") + "=Down  " +
-               paint("D", "1;33") + "=Right  |  " +
-               paint("★", "1;33") + " = Energy Orb")
+    out.append("  Controls: " + paint("W / ▲", "1;33") + "=Up  " +
+               paint("A / ◄", "1;33") + "=Left  " +
+               paint("S / ▼", "1;33") + "=Down  " +
+               paint("D / ►", "1;33") + "=Right  |  [Direct Keypress — No Enter Needed!]")
 
     if log:
         out.append("")

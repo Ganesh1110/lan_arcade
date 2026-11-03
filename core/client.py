@@ -10,6 +10,7 @@ from config import DEFAULT_PORT, MAX_PLAYERS, paint, clear_screen, flush_stdin, 
 from games import GET_GAME_MODULE
 from protocol import decode_message, encode_message
 from utils.discovery import discover_hosts
+from utils.input import read_direct_key
 from utils.validation import clean_name
 
 
@@ -184,20 +185,27 @@ class ClientSession:
 
     def ask_move(self):
         flush_stdin()
+        is_direct = getattr(self.game_module, "direct_input", False)
         while not self.over.is_set():
-            raw = input().strip()
+            if is_direct:
+                raw = read_direct_key(timeout=0.2)
+                if raw is None:
+                    continue
+            else:
+                raw = input().strip()
+
             if self.over.is_set() or not self.turn_event.is_set():
                 return
 
-            if raw.lower() in {"!ff", "!surrender", "!giveup", "!quit", "!exit", "ff", "surrender", "giveup", "quit", "exit", "resign"}:
+            if str(raw).lower() in {"!ff", "!surrender", "!giveup", "!quit", "!exit", "ff", "surrender", "giveup", "quit", "exit", "resign"}:
                 try:
                     self.send({"type": "surrender"})
                 except OSError:
                     return
                 return
 
-            if raw.startswith("!"):
-                msg = raw[1:].strip()
+            if str(raw).startswith("!"):
+                msg = str(raw)[1:].strip()
                 if msg.lower() in {"ff", "surrender", "giveup", "quit", "exit", "resign"}:
                     try:
                         self.send({"type": "surrender"})

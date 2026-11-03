@@ -12,6 +12,7 @@ from core.game_manager import GameManager
 from core.room import Room, SURRENDER_COMMANDS
 from protocol import decode_message, encode_message
 from utils.discovery import start_beacon
+from utils.input import read_direct_key
 from utils.network import get_lan_ip
 from utils.stats import record_match_outcome, record_high_score
 from utils.validation import clean_name
@@ -156,11 +157,21 @@ def play_lan_host(room):
                     surr_pid = room.surrender_queue.get()
                     return handle_surrender(room, gm, surr_pid)
 
-                raw_in = input(f"\n  ▶ YOUR TURN ({current_player.name}) — {prompt_str} (or '!ff' to give up, '! <msg>' to chat): ").strip()
-                if raw_in.lower() in SURRENDER_COMMANDS:
+                if getattr(room.game_module, "direct_input", False):
+                    print(f"\n  ▶ YOUR TURN ({current_player.name}) — [Steer with W/A/S/D or Arrow Keys]: ", end="", flush=True)
+                    raw_in = None
+                    while raw_in is None:
+                        if not room.surrender_queue.empty():
+                            surr_pid = room.surrender_queue.get()
+                            return handle_surrender(room, gm, surr_pid)
+                        raw_in = read_direct_key(timeout=0.2)
+                else:
+                    raw_in = input(f"\n  ▶ YOUR TURN ({current_player.name}) — {prompt_str} (or '!ff' to give up, '! <msg>' to chat): ").strip()
+
+                if str(raw_in).lower() in SURRENDER_COMMANDS:
                     return handle_surrender(room, gm, 0)
-                if raw_in.startswith("!"):
-                    msg = raw_in[1:].strip()
+                if str(raw_in).startswith("!"):
+                    msg = str(raw_in)[1:].strip()
                     if msg.lower() in {"ff", "surrender", "giveup", "quit", "exit", "resign"}:
                         return handle_surrender(room, gm, 0)
                     if msg:
@@ -181,14 +192,15 @@ def play_lan_host(room):
             # Remote player's turn
             print(f"\n  Waiting for {current_player.name}... (Type '!ff' to give up, '! <msg>' to chat)")
             turn_start_time = time.time()
+            turn_limit = getattr(room.game_module, "turn_timeout", TURN_TIMEOUT_SECONDS)
             while True:
                 if not room.surrender_queue.empty():
                     surr_pid = room.surrender_queue.get()
                     return handle_surrender(room, gm, surr_pid)
 
                 elapsed = time.time() - turn_start_time
-                if elapsed > TURN_TIMEOUT_SECONDS:
-                    timeout_msg = f"⏳ {current_player.name} timed out ({TURN_TIMEOUT_SECONDS}s) — turn skipped."
+                if elapsed > turn_limit:
+                    timeout_msg = f"⏳ {current_player.name} timed out ({turn_limit}s) — auto-gliding forward."
                     room.log.append(timeout_msg)
                     room.broadcast({"type": "notice", "message": timeout_msg})
                     gm.skip_player(current_pid)
