@@ -30,7 +30,8 @@ from games import (
     dots_and_boxes, tic_tac_toe, hangman,
     shiritori, game2048,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
-    chess_game, wordle, quiz_show, typing_racer
+    chess_game, wordle, quiz_show, typing_racer,
+    artillery, snake_duel, sonar
 )
 
 
@@ -55,6 +56,9 @@ def host_menu():
             f"Wordle Versus ({wordle.min_players} players)",
             f"College Quiz Show ({quiz_show.min_players}–{quiz_show.max_players} players)",
             f"Typing Racer ({typing_racer.min_players}–{typing_racer.max_players} players)",
+            f"Artillery Duel / Pocket Tanks ({artillery.min_players} players)",
+            f"Snake Duel / Tron Lightcycles ({snake_duel.min_players} players)",
+            f"Sonar Submarine Radar Hunt ({sonar.min_players} players)",
             "Back to Main Menu"
         ]
         print(render_menu("HOST A LAN GAME", options))
@@ -111,10 +115,19 @@ def host_menu():
         elif choice == "17":
             host_lan_game_session(typing_racer)
             break
-        elif choice == "18" or choice.lower() in {"q", "back", "exit"}:
+        elif choice == "18":
+            host_lan_game_session(artillery)
+            break
+        elif choice == "19":
+            host_lan_game_session(snake_duel)
+            break
+        elif choice == "20":
+            host_lan_game_session(sonar)
+            break
+        elif choice == "21" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–18.")
+            print("Please enter 1–21.")
             input("Press Enter to continue...")
 
 

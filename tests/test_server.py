@@ -11,7 +11,8 @@ from games import (
     connect4, bingo, hangman, battleship,
     shiritori, game2048,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
-    chess_game, wordle, quiz_show, typing_racer
+    chess_game, wordle, quiz_show, typing_racer,
+    artillery, snake_duel, sonar
 )
 
 
@@ -20,7 +21,8 @@ class TestServerInit(unittest.TestCase):
         for g in [
             bingo, connect4, hangman, battleship, shiritori, game2048,
             boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
-            chess_game, wordle, quiz_show, typing_racer
+            chess_game, wordle, quiz_show, typing_racer,
+            artillery, snake_duel, sonar
         ]:
             room = Room("TestHost", g)
             self.assertEqual(len(room.players), 1)

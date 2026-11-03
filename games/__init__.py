@@ -18,6 +18,9 @@ from games import chess_game
 from games import wordle
 from games import quiz_show
 from games import typing_racer
+from games import artillery
+from games import snake_duel
+from games import sonar
 
 GAMES_REGISTRY = {
     bingo.game_id: bingo,
@@ -36,7 +39,10 @@ GAMES_REGISTRY = {
     chess_game.game_id: chess_game,
     wordle.game_id: wordle,
     quiz_show.game_id: quiz_show,
-    typing_racer.game_id: typing_racer
+    typing_racer.game_id: typing_racer,
+    artillery.game_id: artillery,
+    snake_duel.game_id: snake_duel,
+    sonar.game_id: sonar
 }
 
 
