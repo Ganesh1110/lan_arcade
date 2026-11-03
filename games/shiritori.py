@@ -27,7 +27,8 @@ def create_state(player_sessions):
         "last_word": None,
         "required_letter": None,
         "turn_index": 0,
-        "winner": None
+        "winner": None,
+        "log": ["🔤 Word Chain started! Form a chain of words."]
     }
 
 
@@ -62,7 +63,8 @@ def view_for(state, player_id):
         "used_count": len(state["used_words"]),
         "used_words": list(state["used_words"]),
         "turn_id": current_player(state),
-        "winner": state["winner"]
+        "winner": state["winner"],
+        "log": state.get("log", [])
     }
 
 
@@ -146,6 +148,10 @@ def apply_action(state, player_id, word):
     if len(actives) == 1:
         state["winner"] = [actives[0]["name"]]
         log_entries.append(f"🏆 {actives[0]['name']} is the last surviving player and WINS!")
+
+    state.setdefault("log", []).extend(log_entries)
+    if len(state["log"]) > 8:
+        state["log"] = state["log"][-8:]
 
     return {"log": log_entries}
 

@@ -22,7 +22,10 @@ from core.solo_modes import (
     run_shiritori_vs_ai,
     run_solo_wordle,
     run_solo_quiz_show,
-    run_solo_typing_racer
+    run_solo_typing_racer,
+    run_artillery_vs_ai,
+    run_snake_duel_vs_ai,
+    run_chess_vs_ai
 )
 from utils.stats import render_hall_of_fame
 from games import (
@@ -142,9 +145,12 @@ def solo_menu():
             "Tic-Tac-Toe (vs Optimal AI)",
             "Snake & Ladders (vs Dice Bot)",
             "Word Chain / Shiritori (vs Lexicon Bot)",
-            "Wordle (Solo 6-Attempt Challenge)",
-            "College Quiz Show (Solo Trivia Challenge)",
+            "Wordle (vs WordleBot 🤖)",
+            "College Quiz Show (vs QuizBot 🤖)",
             "Typing Racer (vs Speedy Bot 🏎️)",
+            "Artillery Duel (vs Ballistics AI 🎯)",
+            "Snake Duel (vs TronBot ⚡)",
+            "Chess (vs ChessBot ♟️)",
             "Back to Main Menu"
         ]
         print(render_menu("SOLO & OFFLINE ARCADE", options))
@@ -170,10 +176,16 @@ def solo_menu():
             run_solo_quiz_show()
         elif choice == "10":
             run_solo_typing_racer()
-        elif choice == "11" or choice.lower() in {"q", "back", "exit"}:
+        elif choice == "11":
+            run_artillery_vs_ai()
+        elif choice == "12":
+            run_snake_duel_vs_ai()
+        elif choice == "13":
+            run_chess_vs_ai()
+        elif choice == "14" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–11.")
+            print("Please enter 1–14.")
             input("Press Enter to continue...")
 
 

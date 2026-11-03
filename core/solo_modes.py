@@ -2,13 +2,16 @@
 Solo and Offline Practice Modes for College LAN Arcade.
 Allows single players to enjoy games against intelligent bots or in high-score chase mode.
 """
+import copy
+import math
 import random
 import time
 from config import clear_screen, paint, play_sound
 from games import (
     connect4, tic_tac_toe, battleship, snake_and_ladder, game2048, shiritori,
-    wordle, quiz_show, typing_racer
+    wordle, quiz_show, typing_racer, artillery, snake_duel, chess_game
 )
+from utils.input import read_direct_key
 from utils.dictionary import get_words_set
 from utils.stats import record_high_score, record_match_outcome
 from utils.validation import clean_name
@@ -396,11 +399,14 @@ def run_shiritori_vs_ai():
             print("\n  📚 LexiconBot is searching its vocabulary...")
             time.sleep(0.8)
             req = state["required_letter"]
-            used = state["used_words"]
-            # Find a word starting with req that hasn't been used
-            matches = [w for w in words_pool if w.startswith(req) and w not in used and 3 <= len(w) <= 8] if req else [w for w in words_pool if 3 <= len(w) <= 6]
+            used = {w.upper() for w in state["used_words"]}
+            if req:
+                req_up = req.upper()
+                matches = [w for w in words_pool if w.upper().startswith(req_up) and w.upper() not in used and 3 <= len(w) <= 8]
+            else:
+                matches = [w for w in words_pool if 3 <= len(w) <= 6]
             if matches:
-                bot_word = random.choice(matches[:50])
+                bot_word = random.choice(matches[:50]).upper()
                 shiritori.apply_action(state, 1, bot_word)
             else:
                 shiritori.apply_action(state, 1, "PASS")
@@ -418,6 +424,33 @@ def run_shiritori_vs_ai():
 # ==========================================
 # 7. SOLO WORDLE PRACTICE
 # ==========================================
+def _get_best_wordle_guess(state, bot_id=1):
+    """Filter candidate target words against all prior green/yellow/gray feedback."""
+    guesses = state["guesses"].get(bot_id, [])
+    candidates = list(wordle.TARGET_WORDS)
+
+    if not guesses:
+        starters = ["CRANE", "SLATE", "STARE", "HEART", "OCEAN", "PLANT"]
+        for s in starters:
+            if s in candidates:
+                return s
+        return random.choice(candidates)
+
+    for g_eval in guesses:
+        guess_str = "".join(l for l, _ in g_eval)
+        new_candidates = []
+        for cand in candidates:
+            if cand == guess_str:
+                continue
+            cand_eval = wordle.evaluate_guess(cand, guess_str)
+            if [st for _, st in cand_eval] == [st for _, st in g_eval]:
+                new_candidates.append(cand)
+        if new_candidates:
+            candidates = new_candidates
+
+    return random.choice(candidates)
+
+
 def run_solo_wordle():
     clear_screen()
     print(paint("=" * 50, "1;36"))
@@ -425,37 +458,47 @@ def run_solo_wordle():
     print(paint("=" * 50, "1;36"))
     name = clean_name(input("\nEnter your player name [Player]: "), "Player")
 
-    state = wordle.create_state([{"id": 0, "name": name}, {"id": 1, "name": "Solo Bot"}])
+    state = wordle.create_state([{"id": 0, "name": name}, {"id": 1, "name": "WordleBot 🤖"}])
 
     while not wordle.is_over(state):
+        curr_id = wordle.current_player(state)
         clear_screen()
         v = wordle.view_for(state, 0)
         print(wordle.render_dashboard(v))
 
-        play_sound("turn")
-        raw = input("\n  ▶ Enter 5-letter word (or 'q' to quit): ").strip()
-        if raw.lower() in {"q", "quit", "exit"}:
-            return
-
-        valid, word = wordle.parse_action(state, 0, raw)
-        if valid:
-            wordle.apply_action(state, 0, word)
+        if curr_id == 0:
+            play_sound("turn")
+            while True:
+                raw = input("\n  ▶ YOUR TURN — Enter 5-letter word (or 'q' to quit): ").strip()
+                if raw.lower() in {"q", "quit", "exit"}:
+                    return
+                valid, word = wordle.parse_action(state, 0, raw)
+                if valid:
+                    wordle.apply_action(state, 0, word)
+                    break
+                print(paint(f"  ! {word}", "1;31"))
         else:
-            print(paint(f"  ! {word}", "1;31"))
-            time.sleep(1.2)
+            print("\n  🤖 WordleBot is analyzing letter frequencies and clues...")
+            time.sleep(1.0)
+            bot_word = _get_best_wordle_guess(state, 1)
+            wordle.apply_action(state, 1, bot_word)
 
     clear_screen()
     v = wordle.view_for(state, 0)
     winners = wordle.get_winner(state)
     target = state["target_word"]
     if state["solved"].get(0, False):
-        msg = f"🎉 Congratulations {name}! You cracked the word '{target}'!"
-        play_sound("win")
         tries = len(state["guesses"].get(0, []))
+        msg = f"🎉 Congratulations {name}! You cracked '{target}' in {tries} tries!"
+        play_sound("win")
         record_high_score("wordle", name, 7 - tries, f"Solved in {tries} tries")
+    elif state["solved"].get(1, False):
+        bot_tries = len(state["guesses"].get(1, []))
+        msg = f"🤖 WordleBot cracked the word '{target}' in {bot_tries} tries! You were outsmarted!"
     else:
         msg = f"💀 Out of attempts! The secret word was '{target}'."
     print(wordle.render_final(v, msg, winners))
+    record_match_outcome("Wordle (vs Bot)", [name, "WordleBot 🤖"], winners)
     input("\nPress Enter to return to solo menu...")
 
 
@@ -469,37 +512,45 @@ def run_solo_quiz_show():
     print(paint("=" * 50, "1;36"))
     name = clean_name(input("\nEnter your player name [Player]: "), "Player")
 
-    state = quiz_show.create_state([{"id": 0, "name": name}, {"id": 1, "name": "QuizBot"}])
+    state = quiz_show.create_state([{"id": 0, "name": name}, {"id": 1, "name": "QuizBot 🤖"}])
 
     while not quiz_show.is_over(state):
+        curr_id = quiz_show.current_player(state)
         clear_screen()
         v = quiz_show.view_for(state, 0)
         print(quiz_show.render_dashboard(v))
 
-        play_sound("turn")
-        raw = input("\n  ▶ Your Answer (A, B, C, D or 'q' to quit): ").strip()
-        if raw.lower() in {"q", "quit", "exit"}:
-            return
-
-        valid, choice = quiz_show.parse_action(state, 0, raw)
-        if valid:
-            quiz_show.apply_action(state, 0, choice)
-            # Advance bot answer automatically
-            if not quiz_show.is_over(state):
-                bot_choice = random.choice(["A", "B", "C", "D"])
-                quiz_show.apply_action(state, 1, bot_choice)
+        if curr_id == 0:
+            play_sound("turn")
+            while True:
+                raw = input("\n  ▶ YOUR TURN — Answer (A, B, C, D or 'q' to quit): ").strip()
+                if raw.lower() in {"q", "quit", "exit"}:
+                    return
+                valid, choice = quiz_show.parse_action(state, 0, raw)
+                if valid:
+                    quiz_show.apply_action(state, 0, choice)
+                    break
+                print(paint(f"  ! {choice}", "1;31"))
         else:
-            print(paint(f"  ! {choice}", "1;31"))
-            time.sleep(1.0)
+            print("\n  🤖 QuizBot is contemplating the question...")
+            time.sleep(1.2)
+            curr_q = state["questions"][state["current_round"]]
+            if random.random() < 0.70:
+                bot_choice = curr_q["answer"]
+            else:
+                bot_choice = random.choice(["A", "B", "C", "D"])
+            quiz_show.apply_action(state, 1, bot_choice)
 
     clear_screen()
     v = quiz_show.view_for(state, 0)
     winners = quiz_show.get_winner(state)
     my_sc = state["scores"].get(0, 0)
-    msg = f"Quiz Finished! Your Final Score: {my_sc} points."
+    bot_sc = state["scores"].get(1, 0)
+    msg = f"Quiz Finished! Your Final Score: {my_sc} pts | QuizBot: {bot_sc} pts."
     print(quiz_show.render_final(v, msg, winners))
     play_sound("win")
     record_high_score("quiz_show", name, my_sc, f"{my_sc} pts")
+    record_match_outcome("Quiz Show (vs Bot)", [name, "QuizBot 🤖"], winners)
     input("\nPress Enter to return to solo menu...")
 
 
@@ -528,10 +579,14 @@ def run_solo_typing_racer():
                 return
             typing_racer.apply_action(state, 0, raw)
         else:
-            time.sleep(0.5)
-            # Bot types snippet with minor realistic delay/accuracy
+            print("\n  🏎️ SpeedyBot is typing furiously at 90 WPM...")
+            time.sleep(1.0)
             snip = typing_racer.TARGET_SNIPPETS[state.get("snippet_index", 0) % len(typing_racer.TARGET_SNIPPETS)]
-            typing_racer.apply_action(state, 1, snip)
+            if random.random() < 0.85:
+                bot_typed = snip
+            else:
+                bot_typed = snip[:-1] + ("x" if snip[-1] != "x" else "y")
+            typing_racer.apply_action(state, 1, bot_typed)
 
     clear_screen()
     v = typing_racer.view_for(state, 0)
@@ -541,4 +596,241 @@ def run_solo_typing_racer():
     play_sound("win")
     record_match_outcome("Typing Racer (vs Bot)", [name, "SpeedyBot 🏎️"], winners)
     input("\nPress Enter to return to solo menu...")
+
+
+# ==========================================
+# 10. ARTILLERY DUEL VS BALLISTICS AI
+# ==========================================
+def _get_best_artillery_shot(terrain, bot_x, target_x, wind):
+    best_shot = (135.0, 60.0)
+    best_dist = 999
+
+    for test_angle in [120, 130, 135, 140, 150]:
+        for test_power in range(35, 95, 5):
+            pts, ix, iy, direct, dmg = artillery.simulate_ballistic_flight(
+                terrain, bot_x, target_x, test_angle, test_power, wind
+            )
+            dist = abs(ix - target_x)
+            if dist < best_dist:
+                best_dist = dist
+                best_shot = (float(test_angle), float(test_power))
+            if dist == 0:
+                break
+        if best_dist == 0:
+            break
+
+    jitter_ang = round(best_shot[0] + random.uniform(-3, 3), 1)
+    jitter_pow = round(best_shot[1] + random.uniform(-4, 4), 1)
+    jitter_ang = max(95.0, min(175.0, jitter_ang))
+    jitter_pow = max(10.0, min(100.0, jitter_pow))
+    return {"angle": jitter_ang, "power": jitter_pow}
+
+
+def run_artillery_vs_ai():
+    clear_screen()
+    print(paint("=" * 50, "1;36"))
+    print(paint("       ARTILLERY DUEL VS BALLISTICS AI 🎯", "1;36"))
+    print(paint("=" * 50, "1;36"))
+    name = clean_name(input("\nEnter your player name [Gunner]: "), "Gunner")
+
+    state = artillery.create_state([{"id": 0, "name": name}, {"id": 1, "name": "Ballistics AI 🎯"}])
+
+    while not artillery.is_over(state):
+        curr_id = artillery.current_player(state)
+        clear_screen()
+        v = artillery.view_for(state, 0)
+        print(artillery.render_dashboard(v))
+
+        if curr_id == 0:
+            play_sound("turn")
+            while True:
+                raw = input("\n  ▶ Enter Angle (0–180°) and Power (1–100) (e.g. '45 60' or 'q' to quit): ").strip()
+                if raw.lower() in {"q", "quit", "exit"}:
+                    return
+                valid, shot_data = artillery.parse_action(state, 0, raw)
+                if valid:
+                    artillery.apply_action(state, 0, shot_data)
+                    break
+                print(paint(f"  ! {shot_data}", "1;31"))
+        else:
+            print("\n  🎯 Ballistics AI is calculating wind deflection & ballistic arc...")
+            time.sleep(1.0)
+            bot_x = state["positions"][1]
+            target_x = state["positions"][0]
+            wind = state["wind"]
+            terrain = state["terrain"]
+            bot_shot = _get_best_artillery_shot(terrain, bot_x, target_x, wind)
+            artillery.apply_action(state, 1, bot_shot)
+
+    clear_screen()
+    v = artillery.view_for(state, 0)
+    winners = artillery.get_winner(state)
+    msg = f"Victor: {', '.join(winners)}!" if winners else "Artillery Draw!"
+    print(artillery.render_final(v, msg, winners))
+    play_sound("win")
+    record_match_outcome("Artillery Duel (vs AI)", [name, "Ballistics AI 🎯"], winners)
+    input("\nPress Enter to return to solo menu...")
+
+
+# ==========================================
+# 11. SNAKE DUEL VS TRON BOT
+# ==========================================
+def _get_best_snake_duel_move(state, bot_id=1):
+    curr_x, curr_y = state["positions"][bot_id]
+    dx, dy = state["directions"][bot_id]
+    pellet = state.get("pellet")
+
+    all_trails = set(state["trails"].get(0, [])) | set(state["trails"].get(1, []))
+    opp_pos = state["positions"].get(0)
+    if opp_pos:
+        all_trails.add(opp_pos)
+
+    candidates = []
+    for cmd, (ndx, ndy) in [("W", (0, -1)), ("S", (0, 1)), ("A", (-1, 0)), ("D", (1, 0))]:
+        if (ndx, ndy) == (-dx, -dy) and len(state["trails"].get(bot_id, [])) > 1:
+            continue
+        nx = curr_x + ndx
+        ny = curr_y + ndy
+        if 0 <= nx < snake_duel.ARENA_WIDTH and 0 <= ny < snake_duel.ARENA_HEIGHT:
+            if (nx, ny) not in all_trails:
+                candidates.append((cmd, (nx, ny)))
+
+    if not candidates:
+        return "STRAIGHT"
+
+    if pellet:
+        candidates.sort(key=lambda item: abs(item[1][0] - pellet[0]) + abs(item[1][1] - pellet[1]))
+
+    return candidates[0][0]
+
+
+def run_snake_duel_vs_ai():
+    clear_screen()
+    print(paint("=" * 50, "1;36"))
+    print(paint("         SNAKE DUEL VS TRON BOT ⚡", "1;36"))
+    print(paint("=" * 50, "1;36"))
+    name = clean_name(input("\nEnter your player name [Rider]: "), "Rider")
+
+    state = snake_duel.create_state([{"id": 0, "name": name}, {"id": 1, "name": "TronBot ⚡"}])
+
+    while not snake_duel.is_over(state):
+        curr_id = snake_duel.current_player(state)
+        clear_screen()
+        v = snake_duel.view_for(state, 0)
+        print(snake_duel.render_dashboard(v))
+
+        if curr_id == 0:
+            play_sound("turn")
+            print(paint("\n  ▶ Steer: Arrow Keys or W/A/S/D (direct keypress, 'q' to quit):", "1;33"), end="", flush=True)
+            cmd = read_direct_key()
+            if cmd is None or cmd.lower() in {"q", "!ff"}:
+                return
+            valid, act = snake_duel.parse_action(state, 0, cmd)
+            if valid:
+                snake_duel.apply_action(state, 0, act)
+            else:
+                snake_duel.apply_action(state, 0, "STRAIGHT")
+        else:
+            time.sleep(0.4)
+            bot_cmd = _get_best_snake_duel_move(state, 1)
+            snake_duel.apply_action(state, 1, bot_cmd)
+
+    clear_screen()
+    v = snake_duel.view_for(state, 0)
+    winners = snake_duel.get_winner(state)
+    msg = f"Arena Champion: {', '.join(winners)}!" if winners else "Mutual Crash!"
+    print(snake_duel.render_final(v, msg, winners))
+    play_sound("win")
+    record_match_outcome("Snake Duel (vs Bot)", [name, "TronBot ⚡"], winners)
+    input("\nPress Enter to return to solo menu...")
+
+
+# ==========================================
+# 12. CHESS VS CHESS BOT
+# ==========================================
+def _get_best_chess_move(board):
+    legal_moves = []
+    for r1 in range(8):
+        for c1 in range(8):
+            p = board[r1][c1]
+            if p is not None and chess_game.is_black_piece(p):
+                for r2 in range(8):
+                    for c2 in range(8):
+                        valid, err = chess_game.is_valid_piece_move(board, r1, c1, r2, c2, False)
+                        if valid:
+                            tb = copy.deepcopy(board)
+                            tb[r2][c2] = tb[r1][c1]
+                            tb[r1][c1] = None
+                            if not chess_game.is_king_in_check(tb, False):
+                                legal_moves.append(((r1, c1), (r2, c2)))
+    if not legal_moves:
+        return None
+
+    piece_vals = {"p": 1, "n": 3, "b": 3, "r": 5, "q": 9, "k": 100,
+                  "P": 1, "N": 3, "B": 3, "R": 5, "Q": 9, "K": 100}
+    scored = []
+    for (r1, c1), (r2, c2) in legal_moves:
+        target = board[r2][c2]
+        score = 0
+        if target is not None:
+            score += piece_vals.get(target, 1) * 10
+        if 2 <= r2 <= 5 and 2 <= c2 <= 5:
+            score += 1
+        scored.append((score, ((r1, c1), (r2, c2))))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best_score = scored[0][0]
+    best_candidates = [m for sc, m in scored if sc == best_score]
+    choice = random.choice(best_candidates)
+    (r1, c1), (r2, c2) = choice
+    from_str = chess_game.to_coord(r1, c1)
+    to_str = chess_game.to_coord(r2, c2)
+    return {"from": (r1, c1), "to": (r2, c2), "notation": f"{from_str}{to_str}"}
+
+
+def run_chess_vs_ai():
+    clear_screen()
+    print(paint("=" * 50, "1;36"))
+    print(paint("           CHESS VS CHESS BOT ♟️", "1;36"))
+    print(paint("=" * 50, "1;36"))
+    name = clean_name(input("\nEnter your player name [Grandmaster]: "), "Grandmaster")
+
+    state = chess_game.create_state([{"id": 0, "name": name}, {"id": 1, "name": "ChessBot ♟️"}])
+
+    while not chess_game.is_over(state):
+        curr_id = chess_game.current_player(state)
+        clear_screen()
+        v = chess_game.view_for(state, 0)
+        print(chess_game.render_dashboard(v))
+
+        if curr_id == 0:
+            play_sound("turn")
+            while True:
+                raw = input("\n  ▶ YOUR TURN (White) — Move (e.g. 'e2e4' or 'e2 e4', 'q' to quit): ").strip()
+                if raw.lower() in {"q", "quit", "exit"}:
+                    return
+                valid, move_data = chess_game.parse_action(state, 0, raw)
+                if valid:
+                    chess_game.apply_action(state, 0, move_data)
+                    break
+                print(paint(f"  ! {move_data}", "1;31"))
+        else:
+            print("\n  ♟️ ChessBot is calculating positional strategy...")
+            time.sleep(1.0)
+            bot_move = _get_best_chess_move(state["board"])
+            if bot_move:
+                chess_game.apply_action(state, 1, bot_move)
+            else:
+                # Checkmate / Stalemate
+                break
+
+    clear_screen()
+    v = chess_game.view_for(state, 0)
+    winners = chess_game.get_winner(state)
+    msg = f"Checkmate! Winner: {', '.join(winners)}!" if winners else "Game Drawn / Concluded."
+    print(chess_game.render_final(v, msg, winners))
+    play_sound("win")
+    record_match_outcome("Chess (vs Bot)", [name, "ChessBot ♟️"], winners)
+    input("\nPress Enter to return to solo menu...")
+
 
