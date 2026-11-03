@@ -65,7 +65,15 @@ class TestAllGamesContract(unittest.TestCase):
             elif g == mini_crossword:
                 raw_input = "1A APPLE"
             elif g == wordoku:
-                raw_input = "R1 C2 B"
+                empty_r, empty_c = 1, 1
+                for r_idx in range(6):
+                    for c_idx in range(6):
+                        if state["grid"][r_idx][c_idx] is None:
+                            empty_r, empty_c = r_idx + 1, c_idx + 1
+                            break
+                    if state["grid"][empty_r - 1][empty_c - 1] is None:
+                        break
+                raw_input = f"R{empty_r} C{empty_c} A"
             elif g == scrabble_sprint:
                 raw_input = "pass"
             elif g == snake_and_ladder:

@@ -7,10 +7,21 @@ Run:
   python3 lan_core.py
 """
 import sys
+import time
+import config
 from config import clear_screen, paint
 from core.client import join_lan_game
 from core.renderer import render_menu
 from core.server import host_lan_game_session
+from core.solo_modes import (
+    run_solo_2048,
+    run_connect4_vs_ai,
+    run_battleship_vs_ai,
+    run_tic_tac_toe_vs_ai,
+    run_snake_and_ladder_vs_ai,
+    run_shiritori_vs_ai
+)
+from utils.stats import render_hall_of_fame
 from games import (
     bingo, connect4, battleship,
     dots_and_boxes, tic_tac_toe, hangman,
@@ -87,13 +98,53 @@ def host_menu():
             input("Press Enter to continue...")
 
 
-def main():
+def solo_menu():
     while True:
         clear_screen()
         options = [
+            "Bingo (vs Computer Bot)",
+            "2048 (Solo Endless High-Score Chase)",
+            "Connect Four (vs Minimax AI)",
+            "Battleship (vs Tactical Hunt AI)",
+            "Tic-Tac-Toe (vs Optimal AI)",
+            "Snake & Ladders (vs Dice Bot)",
+            "Word Chain / Shiritori (vs Lexicon Bot)",
+            "Back to Main Menu"
+        ]
+        print(render_menu("SOLO & OFFLINE ARCADE", options))
+        choice = input("Select solo game: ").strip()
+
+        if choice == "1":
+            bingo.solo_setup()
+        elif choice == "2":
+            run_solo_2048()
+        elif choice == "3":
+            run_connect4_vs_ai()
+        elif choice == "4":
+            run_battleship_vs_ai()
+        elif choice == "5":
+            run_tic_tac_toe_vs_ai()
+        elif choice == "6":
+            run_snake_and_ladder_vs_ai()
+        elif choice == "7":
+            run_shiritori_vs_ai()
+        elif choice == "8" or choice.lower() in {"q", "back", "exit"}:
+            break
+        else:
+            print("Please enter 1–8.")
+            input("Press Enter to continue...")
+
+
+def main():
+    while True:
+        clear_screen()
+        sound_status = paint("ON", "1;32") if config.SOUND_ENABLED else paint("OFF", "31")
+        options = [
             "Host a LAN Game",
-            "Join a LAN Game",
-            "Solo / Local Games (Bingo vs Computer)",
+            "Join a LAN Game (Wi-Fi Auto-Discovery)",
+            "Solo & Offline Arcade (Play vs Computer AI)",
+            "Arcade Hall of Fame & Leaderboards",
+            f"Toggle Audio Effects (Currently: {sound_status})",
             "Exit"
         ]
         print(render_menu("COLLEGE LAN ARCADE", options))
@@ -104,12 +155,21 @@ def main():
         elif choice == "2":
             join_lan_game()
         elif choice == "3":
-            bingo.solo_setup()
+            solo_menu()
         elif choice == "4":
+            clear_screen()
+            print(render_hall_of_fame())
+            input("\nPress Enter to return to main menu...")
+        elif choice == "5":
+            config.SOUND_ENABLED = not config.SOUND_ENABLED
+            st = "ENABLED 🔔" if config.SOUND_ENABLED else "MUTED 🔕"
+            print(paint(f"\n  Audio cues {st}!", "1;33"))
+            time.sleep(0.6)
+        elif choice == "6":
             print("\nThanks for playing College LAN Arcade!")
             sys.exit(0)
         else:
-            print("Please choose 1–4.")
+            print("Please choose 1–6.")
             input("Press Enter to continue...")
 
 

@@ -6,9 +6,10 @@ import socket
 import threading
 import time
 from collections import deque
-from config import DEFAULT_PORT, MAX_PLAYERS, paint, clear_screen, flush_stdin
+from config import DEFAULT_PORT, MAX_PLAYERS, paint, clear_screen, flush_stdin, play_sound
 from games import GET_GAME_MODULE
 from protocol import decode_message, encode_message
+from utils.discovery import discover_hosts
 from utils.validation import clean_name
 
 
@@ -134,6 +135,7 @@ class ClientSession:
                 self.view = message.get("view")
             if self.turn_id == self.my_id:
                 self.turn_event.set()
+                play_sound("turn")
             else:
                 self.turn_event.clear()
             self.redraw()
@@ -151,6 +153,7 @@ class ClientSession:
         elif kind == "chat":
             entry = message.get("entry", f"💬 {message.get('sender')}: {message.get('text')}")
             self.log.append(entry)
+            play_sound("chat")
             self.redraw()
         elif kind == "notice":
             self.log.append(message.get("message", ""))
@@ -158,6 +161,7 @@ class ClientSession:
         elif kind == "error":
             self.say(message.get("message", "Invalid action"), error=True)
         elif kind == "end":
+            play_sound("win")
             self.show_final(message)
             self.over.set()
 
@@ -237,29 +241,97 @@ class ClientSession:
 
 def join_lan_game():
     clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("              JOIN A LAN GAME", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    print("")
-    raw = input("  Host IP address (or ip:port, 'q' to cancel): ").strip()
-    if not raw or raw.lower() in {"q", "quit", "cancel", "back"}:
-        return
-    try:
-        if ":" in raw:
-            host, port_text = raw.split(":")
-            port = int(port_text)
-        else:
-            host = raw
-            port_raw = input(f"  Port [{DEFAULT_PORT}]: ").strip()
-            port = int(port_raw) if port_raw else DEFAULT_PORT
+    print(paint("=" * 56, "1;36"))
+    print(paint("         JOIN A LAN GAME (AUTO-DISCOVERY)", "1;36"))
+    print(paint("=" * 56, "1;36"))
+    print("\n  🔍 Scanning local Wi-Fi / LAN for active games...")
 
-        name = clean_name(input("  Your player name: "), "Guest")
-        print(f"\n  Connecting to {host}:{port} ...")
-        sock = socket.create_connection((host, port), timeout=10)
+    discovered = []
+    try:
+        discovered = discover_hosts(timeout=1.2)
+    except Exception:
+        discovered = []
+
+    target_host = None
+    target_port = DEFAULT_PORT
+
+    if discovered:
+        print(paint(f"\n  Found {len(discovered)} active LAN room(s):", "1;32"))
+        for idx, r in enumerate(discovered, 1):
+            r_name = r.get("room", "Game Room")
+            g_name = r.get("game", "Game")
+            p_cnt = r.get("players", 1)
+            p_max = r.get("max", 4)
+            r_ip = r.get("ip")
+            r_port = r.get("port")
+            print(f"    {idx}. {paint(r_name, '1;33')} — {g_name} ({p_cnt}/{p_max} players) [{r_ip}:{r_port}]")
+
+        print("\n  Options:")
+        print(f"    • Enter [1-{len(discovered)}] to connect to a discovered room")
+        print("    • Enter 'M' for manual IP & port entry")
+        print("    • Enter 'R' to rescan the network")
+        print("    • Enter 'Q' to cancel and return to menu")
+
+        choice = input("\nSelect option: ").strip()
+        if not choice or choice.lower() in {"q", "quit", "cancel", "back", "exit"}:
+            return
+        if choice.lower() in {"r", "rescan"}:
+            return join_lan_game()
+
+        if choice.isdigit() and 1 <= int(choice) <= len(discovered):
+            selected = discovered[int(choice) - 1]
+            target_host = selected["ip"]
+            target_port = selected["port"]
+        elif choice.lower() == "m":
+            target_host = None
+        elif "." in choice:
+            target_host = choice
+        else:
+            target_host = None
+    else:
+        print(paint("\n  [i] No active LAN game beacons detected on your subnet.", "2"))
+        print("      You can enter the host IP manually or press 'R' to rescan.")
+        quick_opt = input("\nEnter host IP (or 'R' to rescan, 'Q' to cancel): ").strip()
+        if not quick_opt or quick_opt.lower() in {"q", "quit", "cancel", "back", "exit"}:
+            return
+        if quick_opt.lower() in {"r", "rescan"}:
+            return join_lan_game()
+        target_host = quick_opt
+
+    if target_host is None:
+        raw = input("\n  Host IP address (or ip:port, 'q' to cancel): ").strip()
+        if not raw or raw.lower() in {"q", "quit", "cancel", "back", "exit"}:
+            return
+        if ":" in raw:
+            parts = raw.split(":")
+            target_host = parts[0]
+            try:
+                target_port = int(parts[1])
+            except ValueError:
+                target_port = DEFAULT_PORT
+        else:
+            target_host = raw
+            port_raw = input(f"  Port [{DEFAULT_PORT}]: ").strip()
+            target_port = int(port_raw) if port_raw else DEFAULT_PORT
+    elif ":" in target_host:
+        parts = target_host.split(":")
+        target_host = parts[0]
+        try:
+            target_port = int(parts[1])
+        except ValueError:
+            pass
+    elif target_port == DEFAULT_PORT and not discovered:
+        port_raw = input(f"  Port [{DEFAULT_PORT}]: ").strip()
+        target_port = int(port_raw) if port_raw else DEFAULT_PORT
+
+    name = clean_name(input("  Your player name: "), "Guest")
+    print(f"\n  Connecting to {target_host}:{target_port} ...")
+    try:
+        sock = socket.create_connection((target_host, target_port), timeout=10)
         sock.settimeout(None)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     except (OSError, ValueError) as exc:
-        print(paint(f"\n  [!] Could not connect to {raw}: {exc}", "1;31"))
+        print(paint(f"\n  [!] Could not connect to {target_host}:{target_port}: {exc}", "1;31"))
         print("      Make sure the host game has started and you are on the same Wi-Fi/LAN.")
         input("\n  Press Enter to return to main menu...")
         return

@@ -6,9 +6,12 @@ import sys
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 50555
+DEFAULT_DISCOVERY_PORT = 50554
 MAX_PLAYERS = 4
 BUFFER_SIZE = 4096
 SOCKET_TIMEOUT = 10.0
+TURN_TIMEOUT_SECONDS = 45
+SOUND_ENABLED = True
 
 USE_COLOR = sys.stdout.isatty()
 if USE_COLOR and os.name == "nt":
@@ -18,6 +21,20 @@ if USE_COLOR and os.name == "nt":
 def paint(value, code):
     """Wrap value in ANSI color escape sequence if color is supported."""
     return f"\033[{code}m{value}\033[0m" if USE_COLOR else str(value)
+
+
+def play_sound(kind="turn"):
+    """Trigger subtle terminal audio cue if sound is enabled."""
+    if not SOUND_ENABLED or not USE_COLOR:
+        return
+    try:
+        if kind == "win":
+            sys.stdout.write("\a\a")
+        else:
+            sys.stdout.write("\a")
+        sys.stdout.flush()
+    except Exception:
+        pass
 
 
 def clear_screen():

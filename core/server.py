@@ -6,12 +6,14 @@ import socket
 import socketserver
 import threading
 import time
-from config import DEFAULT_PORT, paint, clear_screen
+from config import DEFAULT_PORT, paint, clear_screen, play_sound, TURN_TIMEOUT_SECONDS
 from core.exceptions import InvalidMoveError
 from core.game_manager import GameManager
 from core.room import Room, SURRENDER_COMMANDS
 from protocol import decode_message, encode_message
+from utils.discovery import start_beacon
 from utils.network import get_lan_ip
+from utils.stats import record_match_outcome, record_high_score
 from utils.validation import clean_name
 
 
@@ -41,6 +43,23 @@ def handle_surrender(room, gm, surr_pid):
             p.wins += 1
         elif winners:
             p.losses += 1
+
+    # Record persistent match stats and trigger audio
+    record_match_outcome(room.game_module.game_name, [p.name for p in room.players], winners)
+    play_sound("win")
+
+    # Record high scores for score-based games
+    if isinstance(gm.state, dict) and "scores" in gm.state:
+        scores = gm.state["scores"]
+        for p in room.players:
+            if p.player_id in scores:
+                sc = scores[p.player_id]
+                if sc > 0:
+                    detail = None
+                    if room.game_module.game_id == "game2048":
+                        max_t = gm.state.get("max_tiles", {}).get(p.player_id)
+                        detail = f"Tile: {max_t}" if max_t else None
+                    record_high_score(room.game_module.game_id, p.name, sc, detail)
 
     room.broadcast({
         "type": "end",
@@ -128,6 +147,7 @@ def play_lan_host(room):
         print(room.game_module.render_dashboard(host_view))
 
         action_data = None
+        play_sound("turn")
         if current_pid == 0:
             # Host's local turn
             prompt_str = gm.get_prompt_for(0)
@@ -160,10 +180,19 @@ def play_lan_host(room):
         else:
             # Remote player's turn
             print(f"\n  Waiting for {current_player.name}... (Type '!ff' to give up, '! <msg>' to chat)")
+            turn_start_time = time.time()
             while True:
                 if not room.surrender_queue.empty():
                     surr_pid = room.surrender_queue.get()
                     return handle_surrender(room, gm, surr_pid)
+
+                elapsed = time.time() - turn_start_time
+                if elapsed > TURN_TIMEOUT_SECONDS:
+                    timeout_msg = f"⏳ {current_player.name} timed out ({TURN_TIMEOUT_SECONDS}s) — turn skipped."
+                    room.log.append(timeout_msg)
+                    room.broadcast({"type": "notice", "message": timeout_msg})
+                    gm.skip_player(current_pid)
+                    break
 
                 try:
                     pid, raw_act = room.incoming_moves.get(timeout=0.5)
@@ -224,6 +253,23 @@ def play_lan_host(room):
             p.wins += 1
         elif winners:
             p.losses += 1
+
+    # Record persistent match stats and trigger audio
+    record_match_outcome(room.game_module.game_name, [p.name for p in room.players], winners)
+    play_sound("win")
+
+    # Record high scores for score-based games
+    if isinstance(gm.state, dict) and "scores" in gm.state:
+        scores = gm.state["scores"]
+        for p in room.players:
+            if p.player_id in scores:
+                sc = scores[p.player_id]
+                if sc > 0:
+                    detail = None
+                    if room.game_module.game_id == "game2048":
+                        max_t = gm.state.get("max_tiles", {}).get(p.player_id)
+                        detail = f"Tile: {max_t}" if max_t else None
+                    record_high_score(room.game_module.game_id, p.name, sc, detail)
 
     room.broadcast({
         "type": "end",
@@ -313,6 +359,19 @@ def host_lan_game_session(game_module):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     host_ip = get_lan_ip()
 
+    # Start LAN discovery beacon
+    beacon_stop = None
+    try:
+        beacon_stop = start_beacon(
+            f"{host_name}'s Room",
+            game_module.game_name,
+            bound_port,
+            lambda: len(room.players),
+            room.max_players
+        )
+    except Exception:
+        pass
+
     try:
         while True:
             clear_screen()
@@ -353,6 +412,11 @@ def host_lan_game_session(game_module):
         room.broadcast({"type": "end", "message": "Host stopped the game."})
     finally:
         room.closed = True
+        if beacon_stop is not None:
+            try:
+                beacon_stop.set()
+            except Exception:
+                pass
         time.sleep(0.2)
         try:
             server.shutdown()

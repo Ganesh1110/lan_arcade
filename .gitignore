@@ -16,3 +16,7 @@ __pycache__/
 venv/
 ENV/
 env/
+
+# Game data & high scores
+data/*.json
+!data/.gitkeep
