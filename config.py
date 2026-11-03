@@ -11,7 +11,7 @@ MAX_PLAYERS = 4
 BUFFER_SIZE = 4096
 SOCKET_TIMEOUT = 10.0
 TURN_TIMEOUT_SECONDS = 45
-SOUND_ENABLED = True
+SOUND_ENABLED = False
 
 USE_COLOR = sys.stdout.isatty()
 if USE_COLOR and os.name == "nt":
