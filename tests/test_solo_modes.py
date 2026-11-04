@@ -7,7 +7,8 @@ from core.solo_modes import (
     _get_best_wordle_guess,
     _get_best_artillery_shot,
     _get_best_snake_duel_move,
-    _get_best_chess_move
+    _get_best_chess_move,
+    _make_human_typing_attempt
 )
 
 
@@ -81,6 +82,51 @@ class TestSoloModesLogic(unittest.TestCase):
         self.assertIsNotNone(move)
         self.assertIn("from", move)
         self.assertIn("to", move)
+
+    def test_wordle_human_like_second_attempt_no_instant_win(self):
+        state = wordle.create_state([{"id": 0, "name": "P1"}, {"id": 1, "name": "WordleBot"}])
+        state["target_word"] = "PEACE"
+        # Bot's first guess is CRANE
+        wordle.apply_action(state, 1, "CRANE")
+        # In human_like mode, bot should NOT instantly cheat and solve "PEACE" on attempt 2
+        human_guess = _get_best_wordle_guess(state, 1, human_like=True)
+        self.assertEqual(len(human_guess), 5)
+        self.assertTrue(human_guess.isalpha())
+        self.assertNotEqual(human_guess, "PEACE")
+
+    def test_artillery_human_like_ranging_shot(self):
+        terrain = [5] * artillery.WIDTH
+        # Shot 1 should be a ranging sighting shot with power offset
+        shot1 = _get_best_artillery_shot(terrain, bot_x=50, target_x=10, wind=0, shot_num=1, human_like=True)
+        self.assertIn("angle", shot1)
+        self.assertIn("power", shot1)
+        # Verify shot 1 does not hit target directly
+        pts, ix, iy, direct, dmg = artillery.simulate_ballistic_flight(
+            terrain, 50, 10, shot1["angle"], shot1["power"], 0
+        )
+        self.assertFalse(direct)
+        self.assertEqual(dmg, 0)
+
+    def test_typing_racer_human_like_attempt(self):
+        snip = "Life is short, use Python."
+        bot_typed, msg = _make_human_typing_attempt(snip)
+        self.assertTrue(len(bot_typed) > 0)
+        self.assertTrue(isinstance(msg, str))
+
+    def test_snake_duel_human_like_move(self):
+        state = snake_duel.create_state([{"id": 0, "name": "P1"}, {"id": 1, "name": "Bot"}])
+        move = _get_best_snake_duel_move(state, 1, human_like=True)
+        self.assertIn(move, ["W", "A", "S", "D"])
+
+    def test_chess_human_like_opening_book(self):
+        state = chess_game.create_state([{"id": 0, "name": "White"}, {"id": 1, "name": "Black"}])
+        # White moves e2->e4
+        state["board"][4][4] = state["board"][6][4]
+        state["board"][6][4] = None
+        move = _get_best_chess_move(state["board"], ["W: e2➔e4"], human_like=True)
+        self.assertIsNotNone(move)
+        # Should play standard response: e7e5, c7c5, or e7e6
+        self.assertIn(move["notation"], ["e7e5", "c7c5", "e7e6"])
 
 
 if __name__ == "__main__":

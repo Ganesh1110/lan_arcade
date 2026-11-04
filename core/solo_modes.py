@@ -424,14 +424,22 @@ def run_shiritori_vs_ai():
 # ==========================================
 # 7. SOLO WORDLE PRACTICE
 # ==========================================
-def _get_best_wordle_guess(state, bot_id=1):
-    """Filter candidate target words against all prior green/yellow/gray feedback."""
+WORDLE_STARTERS = ["CRANE", "SLATE", "STARE", "HEART", "OCEAN", "PLANT", "AUDIO", "ROAST", "SHINE"]
+WORDLE_HUMAN_EXPLORERS = ["PILOT", "SHINE", "GHOST", "CLOUD", "STORM", "BREAD", "MUSIC", "WATER", "FLAME", "NIGHT"]
+
+
+def _get_best_wordle_guess(state, bot_id=1, human_like=False):
+    """
+    Deduce next guess based on prior feedback.
+    In human_like mode, simulates a human player's gradual exploration:
+    never cheats to instantly solve on attempt 2, exploring vowels and consonants first.
+    """
     guesses = state["guesses"].get(bot_id, [])
+    target = state.get("target_word", "")
     candidates = list(wordle.TARGET_WORDS)
 
     if not guesses:
-        starters = ["CRANE", "SLATE", "STARE", "HEART", "OCEAN", "PLANT"]
-        for s in starters:
+        for s in WORDLE_STARTERS:
             if s in candidates:
                 return s
         return random.choice(candidates)
@@ -448,6 +456,40 @@ def _get_best_wordle_guess(state, bot_id=1):
         if new_candidates:
             candidates = new_candidates
 
+    if not human_like:
+        return random.choice(candidates)
+
+    # Human-like pacing across 6 attempts
+    attempt_num = len(guesses) + 1
+    prior_words = ["".join(l for l, _ in g) for g in guesses]
+
+    # Attempt 2: Human does NOT magically nail the secret word on turn 2
+    if attempt_num == 2:
+        non_target = [c for c in candidates if c != target and c not in prior_words]
+        if non_target:
+            return random.choice(non_target)
+        for exp in WORDLE_HUMAN_EXPLORERS:
+            if exp not in prior_words:
+                return exp
+        return random.choice(candidates)
+
+    # Attempt 3: ~30% chance to pick target if known, else explore plausible candidate
+    if attempt_num == 3:
+        if target in candidates and len(candidates) > 1 and random.random() > 0.30:
+            non_target = [c for c in candidates if c != target and c not in prior_words]
+            if non_target:
+                return random.choice(non_target)
+        return random.choice(candidates)
+
+    # Attempt 4: ~65% chance to solve
+    if attempt_num == 4:
+        if target in candidates and len(candidates) > 1 and random.random() > 0.65:
+            non_target = [c for c in candidates if c != target and c not in prior_words]
+            if non_target:
+                return random.choice(non_target)
+        return random.choice(candidates)
+
+    # Attempt 5+: High solve rate (~90%)
     return random.choice(candidates)
 
 
@@ -478,9 +520,17 @@ def run_solo_wordle():
                     break
                 print(paint(f"  ! {word}", "1;31"))
         else:
-            print("\n  🤖 WordleBot is analyzing letter frequencies and clues...")
+            attempt_num = len(state["guesses"].get(1, [])) + 1
+            if attempt_num == 1:
+                print("\n  🤖 WordleBot is choosing a human opening word...")
+            elif attempt_num == 2:
+                print("\n  🤖 WordleBot is exploring untested vowel and consonant patterns...")
+            elif attempt_num == 3:
+                print("\n  🤖 WordleBot is narrowing down candidate letter clues...")
+            else:
+                print("\n  🤖 WordleBot is synthesizing the remaining clues...")
             time.sleep(1.0)
-            bot_word = _get_best_wordle_guess(state, 1)
+            bot_word = _get_best_wordle_guess(state, 1, human_like=True)
             wordle.apply_action(state, 1, bot_word)
 
     clear_screen()
@@ -532,13 +582,41 @@ def run_solo_quiz_show():
                     break
                 print(paint(f"  ! {choice}", "1;31"))
         else:
-            print("\n  🤖 QuizBot is contemplating the question...")
-            time.sleep(1.2)
             curr_q = state["questions"][state["current_round"]]
-            if random.random() < 0.70:
-                bot_choice = curr_q["answer"]
+            cat = curr_q.get("category", "")
+            cat_accuracy = {
+                "💻 Computer Science": 0.62,
+                "🐍 Python": 0.60,
+                "🌐 Networking & Web": 0.55,
+                "🐧 Linux & OS": 0.55,
+                "🎮 Gaming & Culture": 0.55,
+                "🚀 Tech & Hardware": 0.50,
+                "🧠 AI & Data": 0.50,
+                "🌍 General Knowledge": 0.45,
+                "🌍 Science": 0.45,
+            }
+            base_acc = cat_accuracy.get(cat, 0.52)
+            # Pressure / streak regulation: human error increases if on a hot streak
+            bot_streak = state["streaks"].get(1, 0)
+            if bot_streak >= 1:
+                base_acc = max(0.35, base_acc - 0.12 * bot_streak)
+
+            deliberations = [
+                "🤖 QuizBot is contemplating the question and weighing the options...",
+                "🤖 QuizBot thinks it remembers this concept from college lecture...",
+                "🤖 QuizBot eliminated two unlikely options and is taking an educated guess...",
+                "🤖 QuizBot is debating between two plausible choices..."
+            ]
+            print(f"\n  {random.choice(deliberations)}")
+            time.sleep(random.uniform(1.0, 1.4))
+
+            correct_ans = curr_q["answer"]
+            if random.random() < base_acc:
+                bot_choice = correct_ans
             else:
-                bot_choice = random.choice(["A", "B", "C", "D"])
+                # Human-like mistake: pick a believable wrong answer among the remaining
+                wrong_choices = [c for c in ["A", "B", "C", "D"] if c != correct_ans]
+                bot_choice = random.choice(wrong_choices)
             quiz_show.apply_action(state, 1, bot_choice)
 
     clear_screen()
@@ -557,6 +635,49 @@ def run_solo_quiz_show():
 # ==========================================
 # 9. SOLO TYPING RACER VS SPEEDY BOT
 # ==========================================
+TYPO_MAP = {
+    'a': 's', 'b': 'v', 'c': 'v', 'd': 'f', 'e': 'r', 'f': 'g', 'g': 'h',
+    'h': 'j', 'i': 'o', 'j': 'k', 'k': 'l', 'l': 'k', 'm': 'n', 'n': 'm',
+    'o': 'p', 'p': 'o', 'q': 'w', 'r': 't', 's': 'd', 't': 'y', 'u': 'i',
+    'v': 'b', 'w': 'e', 'x': 'c', 'y': 'u', 'z': 'x',
+    'A': 'S', 'B': 'V', 'C': 'V', 'D': 'F', 'E': 'R', 'F': 'G', 'G': 'H',
+    'H': 'J', 'I': 'O', 'J': 'K', 'K': 'L', 'L': 'K', 'M': 'N', 'N': 'M',
+    'O': 'P', 'P': 'O', 'Q': 'W', 'R': 'T', 'S': 'D', 'T': 'Y', 'U': 'I',
+    'V': 'B', 'W': 'E', 'X': 'C', 'Y': 'U', 'Z': 'X'
+}
+
+def _make_human_typing_attempt(snip):
+    """
+    Generate realistic human typing output for SpeedyBot.
+    Humans type around 55-70 WPM, occasionally making realistic typos,
+    backspacing, or slipping on punctuation.
+    """
+    roll = random.random()
+
+    # ~40% Clean typing (+35% Nitro boost, acc >= 90%)
+    if roll < 0.40:
+        return snip, "🏎️ SpeedyBot locked into a clean, rhythmic typing flow at ~70 WPM!"
+
+    # ~45% Human typo / slight mistake (+20% forward move, acc ~75-85%)
+    elif roll < 0.85:
+        chars = list(snip)
+        L = len(chars)
+        k = max(2, int(round(L * 0.22)))
+        step = max(2, L // k)
+        for i in range(k):
+            idx = min(L - 1, i * step + 1)
+            c = chars[idx]
+            chars[idx] = TYPO_MAP.get(c, 'x' if c != 'x' else 'z')
+        res = "".join(chars)
+        return res, "🏎️ SpeedyBot had slight typos on a few characters (+20% pace)!"
+
+    # ~15% Stumble / fumble (+5% stumble, acc < 60%)
+    else:
+        half_len = max(3, len(snip) // 2)
+        res = snip[:half_len]
+        return res, "🏎️ SpeedyBot fumbled a word and had to backspace (+5% stumble)!"
+
+
 def run_solo_typing_racer():
     clear_screen()
     print(paint("=" * 50, "1;36"))
@@ -579,13 +700,10 @@ def run_solo_typing_racer():
                 return
             typing_racer.apply_action(state, 0, raw)
         else:
-            print("\n  🏎️ SpeedyBot is typing furiously at 90 WPM...")
-            time.sleep(1.0)
-            snip = typing_racer.TARGET_SNIPPETS[state.get("snippet_index", 0) % len(typing_racer.TARGET_SNIPPETS)]
-            if random.random() < 0.85:
-                bot_typed = snip
-            else:
-                bot_typed = snip[:-1] + ("x" if snip[-1] != "x" else "y")
+            snip = typing_racer.get_current_snippet(state)
+            bot_typed, msg = _make_human_typing_attempt(snip)
+            print(f"\n  {msg}")
+            time.sleep(random.uniform(1.1, 1.4))
             typing_racer.apply_action(state, 1, bot_typed)
 
     clear_screen()
@@ -601,7 +719,7 @@ def run_solo_typing_racer():
 # ==========================================
 # 10. ARTILLERY DUEL VS BALLISTICS AI
 # ==========================================
-def _get_best_artillery_shot(terrain, bot_x, target_x, wind):
+def _get_best_artillery_shot(terrain, bot_x, target_x, wind, shot_num=1, human_like=False):
     best_shot = (135.0, 60.0)
     best_dist = 999
 
@@ -619,11 +737,41 @@ def _get_best_artillery_shot(terrain, bot_x, target_x, wind):
         if best_dist == 0:
             break
 
-    jitter_ang = round(best_shot[0] + random.uniform(-3, 3), 1)
-    jitter_pow = round(best_shot[1] + random.uniform(-4, 4), 1)
-    jitter_ang = max(95.0, min(175.0, jitter_ang))
-    jitter_pow = max(10.0, min(100.0, jitter_pow))
-    return {"angle": jitter_ang, "power": jitter_pow}
+    if not human_like:
+        jitter_ang = round(best_shot[0] + random.uniform(-3, 3), 1)
+        jitter_pow = round(best_shot[1] + random.uniform(-4, 4), 1)
+        jitter_ang = max(95.0, min(175.0, jitter_ang))
+        jitter_pow = max(10.0, min(100.0, jitter_pow))
+        return {"angle": jitter_ang, "power": jitter_pow}
+
+    # Human Gunner Phased Ballistics:
+    # Humans never have a built-in trajectory solver; they shoot, observe crater, and adjust.
+    # Shot 1: Sighting / ranging shot (offset by ~12-16 tiles, 0 dmg).
+    if shot_num == 1:
+        p_offset = random.choice([-16.0, -14.0, 14.0])
+        a_offset = random.uniform(-5.0, 5.0)
+        h_ang = round(best_shot[0] + a_offset, 1)
+        h_pow = round(best_shot[1] + p_offset, 1)
+    # Shot 2: Bracketing shot (offset by ~5-8 tiles, at most splash 25 dmg, never direct kill).
+    elif shot_num == 2:
+        p_offset = random.choice([-8.0, -6.0, 7.0])
+        a_offset = random.uniform(-3.0, 3.0)
+        h_ang = round(best_shot[0] + a_offset, 1)
+        h_pow = round(best_shot[1] + p_offset, 1)
+    # Shot 3: Fine-tuning elevation & wind deflection (~2-4 tiles offset).
+    elif shot_num == 3:
+        p_offset = random.choice([-4.0, -2.0, 3.0])
+        a_offset = random.uniform(-2.0, 2.0)
+        h_ang = round(best_shot[0] + a_offset, 1)
+        h_pow = round(best_shot[1] + p_offset, 1)
+    # Shot 4+: Dialed-in effect fire (near miss or direct hit).
+    else:
+        h_ang = round(best_shot[0] + random.uniform(-1.5, 1.5), 1)
+        h_pow = round(best_shot[1] + random.uniform(-2.0, 2.0), 1)
+
+    h_ang = max(95.0, min(175.0, h_ang))
+    h_pow = max(10.0, min(100.0, h_pow))
+    return {"angle": h_ang, "power": h_pow}
 
 
 def run_artillery_vs_ai():
@@ -634,6 +782,7 @@ def run_artillery_vs_ai():
     name = clean_name(input("\nEnter your player name [Gunner]: "), "Gunner")
 
     state = artillery.create_state([{"id": 0, "name": name}, {"id": 1, "name": "Ballistics AI 🎯"}])
+    bot_shot_count = 0
 
     while not artillery.is_over(state):
         curr_id = artillery.current_player(state)
@@ -653,13 +802,21 @@ def run_artillery_vs_ai():
                     break
                 print(paint(f"  ! {shot_data}", "1;31"))
         else:
-            print("\n  🎯 Ballistics AI is calculating wind deflection & ballistic arc...")
+            bot_shot_count += 1
+            if bot_shot_count == 1:
+                print("\n  🎯 Ballistics AI is estimating distance and taking a ranging sighting shot...")
+            elif bot_shot_count == 2:
+                print("\n  🎯 Ballistics AI observed the first crater and is bracketing its angle...")
+            elif bot_shot_count == 3:
+                print("\n  🎯 Ballistics AI is fine-tuning elevation & wind compensation...")
+            else:
+                print("\n  🎯 Ballistics AI has dialed in range and fires for effect!")
             time.sleep(1.0)
             bot_x = state["positions"][1]
             target_x = state["positions"][0]
             wind = state["wind"]
             terrain = state["terrain"]
-            bot_shot = _get_best_artillery_shot(terrain, bot_x, target_x, wind)
+            bot_shot = _get_best_artillery_shot(terrain, bot_x, target_x, wind, shot_num=bot_shot_count, human_like=True)
             artillery.apply_action(state, 1, bot_shot)
 
     clear_screen()
@@ -675,7 +832,7 @@ def run_artillery_vs_ai():
 # ==========================================
 # 11. SNAKE DUEL VS TRON BOT
 # ==========================================
-def _get_best_snake_duel_move(state, bot_id=1):
+def _get_best_snake_duel_move(state, bot_id=1, human_like=False):
     curr_x, curr_y = state["positions"][bot_id]
     dx, dy = state["directions"][bot_id]
     pellet = state.get("pellet")
@@ -693,15 +850,56 @@ def _get_best_snake_duel_move(state, bot_id=1):
         ny = curr_y + ndy
         if 0 <= nx < snake_duel.ARENA_WIDTH and 0 <= ny < snake_duel.ARENA_HEIGHT:
             if (nx, ny) not in all_trails:
-                candidates.append((cmd, (nx, ny)))
+                candidates.append((cmd, (nx, ny), (ndx, ndy)))
 
     if not candidates:
         return "STRAIGHT"
 
-    if pellet:
-        candidates.sort(key=lambda item: abs(item[1][0] - pellet[0]) + abs(item[1][1] - pellet[1]))
+    if not human_like:
+        if pellet:
+            candidates.sort(key=lambda item: abs(item[1][0] - pellet[0]) + abs(item[1][1] - pellet[1]))
+        return candidates[0][0]
 
-    return candidates[0][0]
+    # Human-like lightcycle steering:
+    # 1. Breadth-first search to evaluate open space ahead (avoiding dead ends)
+    scored = []
+    for cmd, (nx, ny), (ndx, ndy) in candidates:
+        visited = set(all_trails)
+        visited.add((nx, ny))
+        queue = [(nx, ny)]
+        space_count = 0
+        while queue and space_count < 14:
+            cx, cy = queue.pop(0)
+            space_count += 1
+            for qdx, qdy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                qx, qy = cx + qdx, cy + qdy
+                if 0 <= qx < snake_duel.ARENA_WIDTH and 0 <= qy < snake_duel.ARENA_HEIGHT:
+                    if (qx, qy) not in visited:
+                        visited.add((qx, qy))
+                        queue.append((qx, qy))
+
+        score = space_count * 3.0
+
+        # Momentum: humans prefer continuing straight unless a turn is required
+        is_straight = ((ndx, ndy) == (dx, dy))
+        if is_straight:
+            score += 8.0
+
+        # Pellet attraction if safe
+        if pellet and space_count >= 6:
+            p_dist = abs(nx - pellet[0]) + abs(ny - pellet[1])
+            score += max(0, 12 - p_dist)
+
+        # Early game spacing (first 3 turns): avoid charging straight into the opponent's midline
+        trail_len = len(state["trails"].get(bot_id, []))
+        if trail_len <= 3 and is_straight and opp_pos and abs(ny - opp_pos[1]) <= 1:
+            score -= 5.0
+
+        score += random.uniform(-0.5, 0.5)
+        scored.append((score, cmd))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return scored[0][1]
 
 
 def run_snake_duel_vs_ai():
@@ -732,7 +930,7 @@ def run_snake_duel_vs_ai():
                 snake_duel.apply_action(state, 0, "STRAIGHT")
         else:
             time.sleep(0.4)
-            bot_cmd = _get_best_snake_duel_move(state, 1)
+            bot_cmd = _get_best_snake_duel_move(state, 1, human_like=True)
             snake_duel.apply_action(state, 1, bot_cmd)
 
     clear_screen()
@@ -748,7 +946,42 @@ def run_snake_duel_vs_ai():
 # ==========================================
 # 12. CHESS VS CHESS BOT
 # ==========================================
-def _get_best_chess_move(board):
+# Standard human opening responses for Black (Rank 8 is row 0, Rank 7 is row 1)
+BLACK_OPENING_BOOK = {
+    # After White 1. e4
+    "e2e4": [
+        ((1, 4), (3, 4)),  # 1... e5 (King's Pawn)
+        ((1, 2), (3, 2)),  # 1... c5 (Sicilian)
+        ((1, 4), (2, 4)),  # 1... e6 (French)
+    ],
+    # After White 1. d4
+    "d2d4": [
+        ((1, 3), (3, 3)),  # 1... d5
+        ((0, 6), (2, 5)),  # 1... Nf6 (Indian)
+    ],
+    # After 1. e4 e5 2. Nf3
+    "e2e4_e7e5_g1f3": [
+        ((0, 1), (2, 2)),  # 2... Nc6 (classic defense of e5)
+        ((0, 6), (2, 5)),  # 2... Nf6 (Petrov defense)
+    ],
+    # After 1. e4 e5 2. Bc4
+    "e2e4_e7e5_f1c4": [
+        ((0, 6), (2, 5)),  # 2... Nf6
+        ((0, 1), (2, 2)),  # 2... Nc6
+    ],
+    # After 1. e4 e5 2. Qh5 (Wayward Queen attack)
+    "e2e4_e7e5_d1h5": [
+        ((0, 1), (2, 2)),  # 2... Nc6 (defend e5!)
+    ],
+    # After 1. d4 d5 2. c4 (Queen's Gambit)
+    "d2d4_d7d5_c2c4": [
+        ((1, 4), (2, 4)),  # 2... e6 (QGD)
+        ((1, 2), (2, 2)),  # 2... c6 (Slav)
+    ]
+}
+
+
+def _get_best_chess_move(board, moves_history=None, human_like=False):
     legal_moves = []
     for r1 in range(8):
         for c1 in range(8):
@@ -768,20 +1001,106 @@ def _get_best_chess_move(board):
 
     piece_vals = {"p": 1, "n": 3, "b": 3, "r": 5, "q": 9, "k": 100,
                   "P": 1, "N": 3, "B": 3, "R": 5, "Q": 9, "K": 100}
+
+    if not human_like:
+        scored = []
+        for (r1, c1), (r2, c2) in legal_moves:
+            target = board[r2][c2]
+            score = 0
+            if target is not None:
+                score += piece_vals.get(target, 1) * 10
+            if 2 <= r2 <= 5 and 2 <= c2 <= 5:
+                score += 1
+            scored.append((score, ((r1, c1), (r2, c2))))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        best_score = scored[0][0]
+        best_candidates = [m for sc, m in scored if sc == best_score]
+        choice = random.choice(best_candidates)
+        (r1, c1), (r2, c2) = choice
+        from_str = chess_game.to_coord(r1, c1)
+        to_str = chess_game.to_coord(r2, c2)
+        return {"from": (r1, c1), "to": (r2, c2), "notation": f"{from_str}{to_str}"}
+
+    # Human-like Chess Playing:
+    # 1. Opening Book matching
+    if moves_history:
+        clean_moves = []
+        for mh in moves_history:
+            parts = mh.split("➔")
+            if len(parts) == 2:
+                from_c = parts[0][-2:].strip().lower()
+                to_c = parts[1][:2].strip().lower()
+                clean_moves.append(f"{from_c}{to_c}")
+
+        key = "_".join(clean_moves)
+        if key in BLACK_OPENING_BOOK:
+            book_choices = [mv for mv in BLACK_OPENING_BOOK[key] if mv in legal_moves]
+            if book_choices:
+                choice = random.choice(book_choices)
+                (r1, c1), (r2, c2) = choice
+                return {"from": (r1, c1), "to": (r2, c2), "notation": f"{chess_game.to_coord(r1, c1)}{chess_game.to_coord(r2, c2)}"}
+
+    # 2. Human Heuristic Evaluation (Piece development, center, king safety, defended pieces)
     scored = []
     for (r1, c1), (r2, c2) in legal_moves:
+        p = board[r1][c1]
         target = board[r2][c2]
-        score = 0
+        score = 0.0
+
+        # Material gain
         if target is not None:
-            score += piece_vals.get(target, 1) * 10
+            score += piece_vals.get(target, 1) * 10.0
+
+        # Center control (d5, e5, d4, e4)
         if 2 <= r2 <= 5 and 2 <= c2 <= 5:
-            score += 1
+            score += 1.5
+
+        # Minor piece development (knights and bishops off back rank)
+        if p in {"n", "b"} and r1 == 0 and r2 > 0:
+            score += 3.0
+
+        # King safety: avoid moving King out into the open early
+        if p == "k" and r1 == 0 and r2 != 0:
+            score -= 4.0
+
+        # Don't move Queen too early without good target
+        if p == "q" and target is None and len(moves_history or []) < 6:
+            score -= 2.0
+
+        # Guarded square penalty (avoid moving valuable piece into a square attacked by White)
+        tb = copy.deepcopy(board)
+        tb[r2][c2] = tb[r1][c1]
+        tb[r1][c1] = None
+        is_attacked = False
+        for wr in range(8):
+            for wc in range(8):
+                wp = tb[wr][wc]
+                if wp and chess_game.is_white_piece(wp):
+                    v, _ = chess_game.is_valid_piece_move(tb, wr, wc, r2, c2, True)
+                    if v:
+                        is_attacked = True
+                        break
+            if is_attacked:
+                break
+
+        if is_attacked:
+            my_val = piece_vals.get(p, 1)
+            target_val = piece_vals.get(target, 0) if target else 0
+            if my_val > target_val:
+                score -= (my_val - target_val) * 7.0
+
+        # Check bonus
+        if chess_game.is_king_in_check(tb, True):
+            score += 3.5
+
+        score += random.uniform(-0.5, 0.5)
         scored.append((score, ((r1, c1), (r2, c2))))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     best_score = scored[0][0]
-    best_candidates = [m for sc, m in scored if sc == best_score]
-    choice = random.choice(best_candidates)
+    top_candidates = [m for sc, m in scored if sc >= best_score - 1.0]
+    choice = random.choice(top_candidates)
     (r1, c1), (r2, c2) = choice
     from_str = chess_game.to_coord(r1, c1)
     to_str = chess_game.to_coord(r2, c2)
@@ -815,9 +1134,13 @@ def run_chess_vs_ai():
                     break
                 print(paint(f"  ! {move_data}", "1;31"))
         else:
-            print("\n  ♟️ ChessBot is calculating positional strategy...")
+            turn_cnt = len(state.get("moves_history", []))
+            if turn_cnt <= 2:
+                print("\n  ♟️ ChessBot is developing its pieces according to classical opening principles...")
+            else:
+                print("\n  ♟️ ChessBot is evaluating tactical positioning and piece safety...")
             time.sleep(1.0)
-            bot_move = _get_best_chess_move(state["board"])
+            bot_move = _get_best_chess_move(state["board"], state.get("moves_history", []), human_like=True)
             if bot_move:
                 chess_game.apply_action(state, 1, bot_move)
             else:

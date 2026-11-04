@@ -18,6 +18,20 @@ BLACK_PIECES = {
     "k": "♚", "q": "♛", "r": "♜", "b": "♝", "n": "♞", "p": "♟"
 }
 
+# High-clarity coin representations (Piece glyph + uppercase/lowercase piece letter)
+# Completely eliminates confusion between Bishop (B/b) and Soldier/Pawn (P/p)
+WHITE_COINS = {
+    "K": "♔ K", "Q": "♕ Q", "R": "♖ R", "B": "♗ B", "N": "♘ N", "P": "♙ P"
+}
+BLACK_COINS = {
+    "k": "♚ k", "q": "♛ q", "r": "♜ r", "b": "♝ b", "n": "♞ n", "p": "♟ p"
+}
+
+PIECE_VALUES = {
+    "p": 1, "n": 3, "b": 3, "r": 5, "q": 9, "k": 100,
+    "P": 1, "N": 3, "B": 3, "R": 5, "Q": 9, "K": 100
+}
+
 FILES = ["a", "b", "c", "d", "e", "f", "g", "h"]
 
 
@@ -369,12 +383,29 @@ def skip_player(state, player_id):
         state["turn_index"] += 1
 
 
-def _render_chess_board(board):
+def _format_captured_coins(cap_list, is_white_capturer):
+    if not cap_list:
+        return "None"
+    coins_map = BLACK_COINS if is_white_capturer else WHITE_COINS
+    counts = {}
+    for p in cap_list:
+        counts[p] = counts.get(p, 0) + 1
+    order = ["q", "r", "b", "n", "p"] if is_white_capturer else ["Q", "R", "B", "N", "P"]
+    items = []
+    for p in order:
+        if p in counts:
+            coin = coins_map.get(p, p)
+            cnt = counts[p]
+            items.append(f"{coin}×{cnt}" if cnt > 1 else coin)
+    return "  ".join(items) if items else "None"
+
+
+def _render_chess_board(board, last_src=None, last_dest=None, checked_king=None):
     lines = []
-    files_header = "     A    B    C    D    E    F    G    H"
-    border_top  = "   ┌────┬────┬────┬────┬────┬────┬────┬────┐"
-    border_mid  = "   ├────┼────┼────┼────┼────┼────┼────┼────┤"
-    border_bot  = "   └────┴────┴────┴────┴────┴────┴────┴────┘"
+    files_header = "      A     B     C     D     E     F     G     H"
+    border_top  = "   ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐"
+    border_mid  = "   ├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤"
+    border_bot  = "   └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘"
 
     lines.append(paint(files_header, "1;36"))
     lines.append(border_top)
@@ -385,17 +416,33 @@ def _render_chess_board(board):
         for c in range(8):
             piece = board[r][c]
             is_light_sq = ((r + c) % 2 == 0)
+            is_last_src = (last_src == (r, c))
+            is_last_dst = (last_dest == (r, c))
+            is_king_check = (checked_king == (r, c))
 
             if piece is None:
-                cell_content = " ·  " if is_light_sq else "    "
-                styled = paint(cell_content, "2")
+                if is_last_src:
+                    styled = paint("  ◇  ", "1;32")
+                else:
+                    cell_content = "  ·  " if is_light_sq else "     "
+                    styled = paint(cell_content, "2;37")
             else:
                 if piece.isupper():
-                    sym = WHITE_PIECES.get(piece, piece)
-                    styled = paint(f" {sym}  ", "1;37;44")  # White piece on blue cell
+                    coin = WHITE_COINS.get(piece, f"{piece}  ")
+                    if is_king_check:
+                        styled = paint(f" {coin} ", "1;37;41")  # Checked king alert
+                    elif is_last_dst:
+                        styled = paint(f" {coin} ", "1;97;42")  # Destination square highlight
+                    else:
+                        styled = paint(f" {coin} ", "1;37;44")  # White piece on blue cell
                 else:
-                    sym = BLACK_PIECES.get(piece, piece)
-                    styled = paint(f" {sym}  ", "1;33;41")  # Black piece on red cell
+                    coin = BLACK_COINS.get(piece, f"{piece}  ")
+                    if is_king_check:
+                        styled = paint(f" {coin} ", "1;33;41")  # Checked king alert
+                    elif is_last_dst:
+                        styled = paint(f" {coin} ", "1;33;42")  # Destination square highlight
+                    else:
+                        styled = paint(f" {coin} ", "1;33;41")  # Black piece on red cell
 
             row_cells.append(styled)
 
@@ -419,6 +466,35 @@ def render_dashboard(view):
     moves = view.get("moves_history", [])
     log = view.get("log", [])
 
+    # Extract last move coordinates for board highlighting
+    last_src = None
+    last_dest = None
+    if moves:
+        last_m = moves[-1]
+        parts = last_m.split("➔")
+        if len(parts) == 2:
+            src_str = parts[0][-2:].strip().lower()
+            dst_str = parts[1][:2].strip().lower()
+            last_src = parse_coord(src_str)
+            last_dest = parse_coord(dst_str)
+
+    # Determine which King is under check
+    checked_king = None
+    if in_check:
+        curr_turn_side = "White"
+        for p in players:
+            if p["id"] == turn_id:
+                curr_turn_side = p.get("side", "White")
+                break
+        checked_king = find_king(board, is_white=(curr_turn_side == "White"))
+
+    # Material calculations
+    sc_w = sum(PIECE_VALUES.get(p, 0) for p in captured_w)
+    sc_b = sum(PIECE_VALUES.get(p, 0) for p in captured_b)
+    diff = sc_w - sc_b
+    lead_w = f" {paint(f'(+{diff} material lead)', '1;32')}" if diff > 0 else ""
+    lead_b = f" {paint(f'(+{abs(diff)} material lead)', '1;32')}" if diff < 0 else ""
+
     out = [
         paint("=" * 56, "1;36"),
         paint("                 C H E S S   A R C A D E", "1;36"),
@@ -426,15 +502,20 @@ def render_dashboard(view):
         ""
     ]
 
-    # Captured pieces summary
-    cap_w_str = " ".join(BLACK_PIECES.get(p, p) for p in captured_w) or "None"
-    cap_b_str = " ".join(WHITE_PIECES.get(p, p) for p in captured_b) or "None"
-    out.append(f"  Captured by White: {paint(cap_w_str, '1;33')}")
-    out.append(f"  Captured by Black: {paint(cap_b_str, '1;37')}")
+    # Captured pieces summary with clear coin labels and point advantage
+    cap_w_str = _format_captured_coins(captured_w, True)
+    cap_b_str = _format_captured_coins(captured_b, False)
+    out.append(f"  Captured by White: {paint(cap_w_str, '1;33')}{lead_w}")
+    out.append(f"  Captured by Black: {paint(cap_b_str, '1;37')}{lead_b}")
     out.append("")
 
-    # Chessboard
-    out.append(_render_chess_board(board))
+    # Enhanced Chessboard with move tracking and check highlighting
+    out.append(_render_chess_board(board, last_src, last_dest, checked_king))
+    out.append("")
+
+    # High-clarity Coin Legend
+    out.append("  " + paint("COIN GUIDE:", "1;33") + "  ♔/♚ King (K)    ♕/♛ Queen (Q)    ♖/✜ Rook (R)")
+    out.append("               ♗/♝ Bishop (B)  ♘/♞ Knight (N)   ♙/♟ Soldier/Pawn (P)")
     out.append("")
 
     if in_check:

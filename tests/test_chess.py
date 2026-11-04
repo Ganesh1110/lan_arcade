@@ -56,6 +56,22 @@ class TestChessGame(unittest.TestCase):
         self.state["board"][3][4] = "q"  # Black Queen on e5
         self.assertTrue(chess_game.is_king_in_check(self.state["board"], is_white=True))
 
+    def test_enhanced_chess_rendering_clarity(self):
+        # Verify Bishop and Soldier/Pawn have distinct, clear labels
+        self.assertIn("B", chess_game.WHITE_COINS["B"])
+        self.assertIn("P", chess_game.WHITE_COINS["P"])
+        self.assertIn("b", chess_game.BLACK_COINS["b"])
+        self.assertIn("p", chess_game.BLACK_COINS["p"])
+        self.assertNotEqual(chess_game.WHITE_COINS["B"], chess_game.WHITE_COINS["P"])
+        self.assertNotEqual(chess_game.BLACK_COINS["b"], chess_game.BLACK_COINS["p"])
+
+        # Verify board and dashboard include piece guide
+        view = chess_game.view_for(self.state, 0)
+        dash = chess_game.render_dashboard(view)
+        self.assertIn("COIN GUIDE", dash)
+        self.assertIn("Bishop (B)", dash)
+        self.assertIn("Soldier/Pawn (P)", dash)
+
 
 if __name__ == "__main__":
     unittest.main()
