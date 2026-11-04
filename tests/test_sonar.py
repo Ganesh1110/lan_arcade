@@ -40,6 +40,25 @@ class TestSonarSubmarine(unittest.TestCase):
         # Direct hit takes 2 damage from 3 HP -> 1 HP
         self.assertEqual(self.state["hp"][1], 1)
 
+    def test_render_dashboard_shows_submarine_icon(self):
+        # Test with list (as deserialized from JSON network payloads) and tuple
+        view_with_list = {
+            "name": "SubCmdr1",
+            "opponent_name": "SubCmdr2",
+            "my_hp": 3,
+            "opp_hp": 3,
+            "my_torpedoes": 4,
+            "my_pings": 3,
+            "my_pos": [7, 7],  # Position H8 as list
+            "my_shots": {"3,4": "miss"},
+            "turn_id": 0,
+            "player_id": 0,
+            "log": []
+        }
+        rendered = sonar.render_dashboard(view_with_list)
+        self.assertIn("▲", rendered)
+        self.assertIn("H8", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

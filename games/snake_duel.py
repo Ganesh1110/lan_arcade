@@ -15,7 +15,6 @@ direct_input = True
 ARENA_WIDTH = 30
 ARENA_HEIGHT = 14
 POINTS_PER_FRUIT = 10
-TARGET_SCORE = 50
 INITIAL_SNAKE_LENGTH = 2
 
 DIRS = {
@@ -83,11 +82,10 @@ def create_state(player_sessions):
         "alive": alive,
         "lengths": lengths,
         "scores": scores,
-        "target_score": TARGET_SCORE,
         "pellet": pellet,
         "turn_index": 0,
         "winner": None,
-        "log": [f"🐍 Arena active! Eat 🍎 fruits to grow. First to reach {TARGET_SCORE} pts without crashing wins!"]
+        "log": ["🐍 Endless Arena active! Eat 🍎 fruits to grow & score (+10 pts). Avoid crashing!"]
     }
 
 
@@ -125,7 +123,6 @@ def view_for(state, player_id):
         "alive": alive,
         "lengths": lengths,
         "scores": scores,
-        "target_score": state.get("target_score", TARGET_SCORE),
         "pellet": tuple(state["pellet"]) if state.get("pellet") else None,
         "turn_id": current_player(state),
         "winner": state["winner"],
@@ -226,15 +223,8 @@ def apply_action(state, player_id, cmd):
             state["lengths"][player_id] = state["lengths"].get(player_id, INITIAL_SNAKE_LENGTH) + 1
             state["scores"][player_id] = state["scores"].get(player_id, 0) + POINTS_PER_FRUIT
             curr_score = state["scores"][player_id]
-            target = state.get("target_score", TARGET_SCORE)
-            log_entries.append(f"🍎 {p_name} ate a fruit! (+{POINTS_PER_FRUIT} pts) -> Total: {curr_score}/{target} pts | Length: {state['lengths'][player_id]}")
-
-            # Win condition: reaching target point without crashing
-            if curr_score >= target:
-                state["winner"] = [p_name]
-                log_entries.append(f"🏆 TARGET REACHED! {p_name} scored {curr_score} pts without crashing and WINS! 🎉")
-            else:
-                state["pellet"] = spawn_pellet(state["trails"], state["positions"][player_id], state["positions"][opp_id])
+            log_entries.append(f"🍎 {p_name} ate a fruit! (+{POINTS_PER_FRUIT} pts) -> Total: {curr_score} pts | Length: {state['lengths'][player_id]}")
+            state["pellet"] = spawn_pellet(state["trails"], state["positions"][player_id], state["positions"][opp_id])
         else:
             # Slither forward by trimming the tail to snake length
             while len(state["trails"][player_id]) > state["lengths"].get(player_id, INITIAL_SNAKE_LENGTH):
@@ -250,15 +240,7 @@ def apply_action(state, player_id, cmd):
 
 
 def is_over(state):
-    if state.get("winner") is not None:
-        return True
-    if not all(state.get("alive", {}).values()):
-        return True
-    target = state.get("target_score", TARGET_SCORE)
-    for pid, sc in state.get("scores", {}).items():
-        if sc >= target:
-            return True
-    return False
+    return state.get("winner") is not None or not all(state.get("alive", {}).values())
 
 
 def get_winner(state):
@@ -345,7 +327,6 @@ def render_dashboard(view):
     lengths = {int(k): v for k, v in raw_len.items()} if isinstance(raw_len, dict) else {}
     raw_sc = view.get("scores", {})
     scores = {int(k): v for k, v in raw_sc.items()} if isinstance(raw_sc, dict) else {}
-    target_score = view.get("target_score", TARGET_SCORE)
     pellet = tuple(view["pellet"]) if view.get("pellet") else None
     turn_id = view.get("turn_id")
     my_id = view.get("player_id")
@@ -354,7 +335,7 @@ def render_dashboard(view):
     out = [
         paint("=" * 66, "1;36"),
         paint("               ⚡ S N A K E   D U E L ⚡", "1;36"),
-        paint(f"   🎯 TARGET POINT TO WIN: {target_score} PTS WITHOUT CRASHING! (🍎 = +{POINTS_PER_FRUIT} pts)   ", "1;37;44"),
+        paint("   ♾️  ENDLESS SURVIVAL: Eat 🍎 to grow & score (+10 pts) | Outlast Rival   ", "1;37;44"),
         paint("=" * 66, "1;36"),
         ""
     ]
@@ -373,8 +354,8 @@ def render_dashboard(view):
     p1_active = " ▶" if turn_id == p1["id"] else "  "
     p2_active = " ▶" if turn_id == p2["id"] else "  "
 
-    out.append(f"{p1_active} [P1] {p1['name']:<12}: Status: {st1} | Score: {paint(f'{sc1}/{target_score}', '1;33')} pts | Length: {len1}")
-    out.append(f"{p2_active} [P2] {p2['name']:<12}: Status: {st2} | Score: {paint(f'{sc2}/{target_score}', '1;36')} pts | Length: {len2}")
+    out.append(f"{p1_active} [P1] {p1['name']:<12}: Status: {st1} | Score: {paint(f'{sc1} pts', '1;33')} | Length: {len1}")
+    out.append(f"{p2_active} [P2] {p2['name']:<12}: Status: {st2} | Score: {paint(f'{sc2} pts', '1;36')} | Length: {len2}")
     out.append("")
 
     # Arena
@@ -398,7 +379,8 @@ def render_final(view, message, winners):
     parts = [render_dashboard(view), ""]
     raw_sc = view.get("scores", {})
     scores = {int(k): v for k, v in raw_sc.items()} if isinstance(raw_sc, dict) else {}
-    target_score = view.get("target_score", TARGET_SCORE)
+    raw_len = view.get("lengths", {})
+    lengths = {int(k): v for k, v in raw_len.items()} if isinstance(raw_len, dict) else {}
     players = view.get("players", [])
 
     if winners:
@@ -408,7 +390,7 @@ def render_final(view, message, winners):
         parts.append(paint("  Both snakes crashed in a head-on tie!", "1;33"))
 
     score_summary = "  Final Scores: " + "  vs  ".join(
-        f"{p['name']}: {scores.get(p['id'], 0)}/{target_score} pts" for p in players
+        f"{p['name']}: {scores.get(p['id'], 0)} pts (Length: {lengths.get(p['id'], len(view.get('trails', {}).get(p['id'], [])))})" for p in players
     )
     parts.append(paint(score_summary, "1;36"))
     return "\n".join(parts)

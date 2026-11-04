@@ -71,18 +71,20 @@ class TestSnakeDuel(unittest.TestCase):
         self.assertEqual(len(self.state["trails"][0]), 2)
         self.assertEqual(self.state["trails"][0], [(6, 5), (7, 5)])
 
-    def test_target_score_wins_without_crashing(self):
-        # When player reaches target score (e.g. 50), they win immediately without crashing
-        self.state["scores"][0] = snake_duel.TARGET_SCORE - snake_duel.POINTS_PER_FRUIT
+    def test_no_limit_endless_survival(self):
+        # Fruit eating increases score and length with no forced limit/cap
+        self.state["scores"][0] = 50
+        self.state["lengths"][0] = 7
         self.state["positions"][0] = (5, 5)
         self.state["directions"][0] = (1, 0)
         self.state["pellet"] = (6, 5)
 
         snake_duel.apply_action(self.state, 0, "D")
-        self.assertEqual(self.state["scores"][0], snake_duel.TARGET_SCORE)
+        self.assertEqual(self.state["scores"][0], 60)
+        self.assertEqual(self.state["lengths"][0], 8)
         self.assertTrue(self.state["alive"][0])
-        self.assertTrue(snake_duel.is_over(self.state))
-        self.assertEqual(snake_duel.get_winner(self.state), ["Cycle1"])
+        # Game does NOT end on reaching 50 or 60 pts; it is endless survival until crash!
+        self.assertFalse(snake_duel.is_over(self.state))
 
 
 if __name__ == "__main__":

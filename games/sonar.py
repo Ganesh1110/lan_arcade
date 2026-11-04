@@ -91,9 +91,11 @@ def view_for(state, player_id):
     my_shots = {}
     if player_id in state.get("shots_history", {}):
         for k_str, val in state["shots_history"][player_id].items():
-            # handle tuple or str key
             coord = eval(k_str) if isinstance(k_str, str) and "(" in k_str else k_str
-            my_shots[tuple(coord)] = val
+            if isinstance(coord, (tuple, list)):
+                my_shots[f"{coord[0]},{coord[1]}"] = val
+            else:
+                my_shots[str(coord)] = val
 
     return {
         "player_id": player_id,
@@ -273,6 +275,8 @@ def skip_player(state, player_id):
 
 def _render_radar_maps(my_pos, my_shots):
     """Render side-by-side: Own Navigation Map vs Tactical Torpedo Map."""
+    if my_pos is not None:
+        my_pos = tuple(my_pos)
     lines = []
     header = "      [OWN SUB NAVIGATION]              [TACTICAL TORPEDO RADAR]"
     col_hdr = "    A B C D E F G H                 A B C D E F G H"
@@ -288,7 +292,7 @@ def _render_radar_maps(my_pos, my_shots):
         # Left map (Own Sub)
         left_cells = []
         for c in range(GRID_SIZE):
-            if (r, c) == my_pos:
+            if my_pos is not None and (r, c) == my_pos:
                 left_cells.append(paint("▲ ", "1;30;42"))  # Own sub icon
             else:
                 left_cells.append("· ")
@@ -321,8 +325,26 @@ def render_dashboard(view):
     opp_hp = view.get("opp_hp", 3)
     my_torps = view.get("my_torpedoes", 4)
     my_pings = view.get("my_pings", 3)
-    my_pos = view.get("my_pos", (0, 0))
-    my_shots = view.get("my_shots", {})
+    raw_pos = view.get("my_pos", (0, 0))
+    my_pos = tuple(raw_pos) if raw_pos is not None else (0, 0)
+
+    # Normalize tracking map keys to (r, c) tuples
+    raw_shots = view.get("my_shots", {})
+    my_shots = {}
+    if isinstance(raw_shots, dict):
+        for k, v in raw_shots.items():
+            if isinstance(k, tuple):
+                my_shots[k] = v
+            elif isinstance(k, list) and len(k) == 2:
+                my_shots[tuple(k)] = v
+            elif isinstance(k, str):
+                cleaned = k.strip("()[] ")
+                if "," in cleaned:
+                    parts = cleaned.split(",")
+                    try:
+                        my_shots[(int(parts[0].strip()), int(parts[1].strip()))] = v
+                    except Exception:
+                        pass
     turn_id = view.get("turn_id")
     my_id = view.get("player_id")
     log = view.get("log", [])

@@ -938,20 +938,14 @@ def run_snake_duel_vs_ai():
     winners = snake_duel.get_winner(state)
     my_sc = state.get("scores", {}).get(0, 0)
     bot_sc = state.get("scores", {}).get(1, 0)
-    target = state.get("target_score", snake_duel.TARGET_SCORE)
+    my_len = state.get("lengths", {}).get(0, 2)
 
     if winners and winners[0] == name:
-        if my_sc >= target:
-            msg = f"🎉 VICTORY! {name} reached the target {target} pts without crashing!"
-        else:
-            msg = f"🏆 VICTORY! TronBot crashed! {name} survives with {my_sc} pts!"
+        msg = f"🏆 VICTORY! TronBot crashed! {name} survives with {my_sc} pts (Length: {my_len})!"
         play_sound("win")
-        record_high_score("snake_duel", name, my_sc, f"{my_sc} pts (Target: {target})")
+        record_high_score("snake_duel", name, my_sc, f"{my_sc} pts (Length: {my_len})")
     elif winners and "TronBot" in winners[0]:
-        if bot_sc >= target:
-            msg = f"🤖 TronBot reached {target} pts first! You were outscored ({my_sc} vs {bot_sc})!"
-        else:
-            msg = f"💥 You crashed! TronBot wins the duel ({my_sc} vs {bot_sc})!"
+        msg = f"💥 You crashed! TronBot wins the duel ({my_sc} vs {bot_sc} pts)!"
     else:
         msg = f"Arena tie! (Final score: You {my_sc} - {bot_sc} TronBot)"
 
