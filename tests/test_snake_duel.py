@@ -43,6 +43,47 @@ class TestSnakeDuel(unittest.TestCase):
         self.assertTrue(snake_duel.is_over(self.state))
         self.assertEqual(snake_duel.get_winner(self.state), ["Cycle2"])
 
+    def test_fruit_eating_grows_snake_and_scores(self):
+        # Place fruit directly in path of player 0
+        self.state["positions"][0] = (5, 5)
+        self.state["directions"][0] = (1, 0)
+        self.state["pellet"] = (6, 5)
+        old_len = self.state["lengths"][0]
+        old_score = self.state["scores"][0]
+
+        snake_duel.apply_action(self.state, 0, "D")
+        self.assertEqual(self.state["positions"][0], (6, 5))
+        self.assertEqual(self.state["scores"][0], old_score + snake_duel.POINTS_PER_FRUIT)
+        self.assertEqual(self.state["lengths"][0], old_len + 1)
+        self.assertTrue(self.state["alive"][0])
+
+    def test_tail_trims_when_not_eating_fruit(self):
+        # Move without fruit and ensure trail doesn't exceed snake length
+        self.state["pellet"] = (25, 12)  # Far away
+        self.state["positions"][0] = (5, 5)
+        self.state["trails"][0] = [(5, 5)]
+        self.state["lengths"][0] = 2
+
+        snake_duel.apply_action(self.state, 0, "D")  # to (6, 5), len becomes 2
+        self.assertEqual(len(self.state["trails"][0]), 2)
+
+        snake_duel.apply_action(self.state, 0, "D")  # to (7, 5), len remains 2 (tail trimmed)
+        self.assertEqual(len(self.state["trails"][0]), 2)
+        self.assertEqual(self.state["trails"][0], [(6, 5), (7, 5)])
+
+    def test_target_score_wins_without_crashing(self):
+        # When player reaches target score (e.g. 50), they win immediately without crashing
+        self.state["scores"][0] = snake_duel.TARGET_SCORE - snake_duel.POINTS_PER_FRUIT
+        self.state["positions"][0] = (5, 5)
+        self.state["directions"][0] = (1, 0)
+        self.state["pellet"] = (6, 5)
+
+        snake_duel.apply_action(self.state, 0, "D")
+        self.assertEqual(self.state["scores"][0], snake_duel.TARGET_SCORE)
+        self.assertTrue(self.state["alive"][0])
+        self.assertTrue(snake_duel.is_over(self.state))
+        self.assertEqual(snake_duel.get_winner(self.state), ["Cycle1"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -80,7 +80,7 @@ def handle_surrender(room, gm, surr_pid):
 
     choice = input("\nSelect option [1]: ").strip()
     if choice == "2":
-        room.broadcast({"type": "end", "message": "Host returned to menu."})
+        room.broadcast({"type": "host_exit", "message": "Host returned to main menu."})
     else:
         room.broadcast({"type": "rematch", "message": "Host initiated a rematch!"})
         time.sleep(0.8)
@@ -91,6 +91,15 @@ def play_lan_host(room):
     """Host authoritative main game loop."""
     gm = GameManager(room.game_module)
     gm.initialize(room.players)
+
+    # Clean state for new game / rematch
+    room.drain_moves()
+    while not room.surrender_queue.empty():
+        try:
+            room.surrender_queue.get_nowait()
+        except Exception:
+            break
+    room.log.clear()
 
     # Send initial game view payload to each client
     for p in room.players:
@@ -301,7 +310,7 @@ def play_lan_host(room):
 
     choice = input("\nSelect option [1]: ").strip()
     if choice == "2":
-        room.broadcast({"type": "end", "message": "Host returned to menu."})
+        room.broadcast({"type": "host_exit", "message": "Host returned to main menu."})
         return
     else:
         room.broadcast({"type": "rematch", "message": "Host initiated a rematch!"})

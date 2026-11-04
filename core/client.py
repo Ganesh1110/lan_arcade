@@ -31,6 +31,7 @@ class ClientSession:
         self.turn_name = ""
         self.lobby_players = []
         self.started = False
+        self.match_ended = False
         self.log = deque(maxlen=6)
 
     def prompt(self):
@@ -87,7 +88,11 @@ class ClientSession:
                 print(self.game_module.render_final(self.view, msg_text, winners))
             else:
                 print(paint(f"\n  {msg_text}", "1;33"))
-            print(paint("\n  Press Enter to return to the main menu...", "1;36"))
+            print(paint("\n  ════════════════════════════════════════════════════════════", "1;36"))
+            print(paint("  ⏳ Match Complete! Waiting for host (Rematch / Main Menu)...", "1;33"))
+            print(paint("  • If host chooses Rematch, the next round starts automatically!", "2"))
+            print(paint("  • Press 'Q' to leave and return to the main menu.", "2"))
+            print(paint("  ════════════════════════════════════════════════════════════", "1;36"))
 
     def send(self, payload):
         data = encode_message(payload)
@@ -117,14 +122,17 @@ class ClientSession:
             self.view = message.get("view", {})
             self.players = message.get("players", [])
             self.started = True
-            self.over.clear()
+            self.match_ended = False
+            self.turn_event.clear()
+            self.log.clear()
             self.log.append("Game started!")
             self.redraw()
         elif kind == "rematch":
-            self.over.clear()
+            self.match_ended = False
             self.turn_event.clear()
             if message.get("game_id"):
                 self.game_module = GET_GAME_MODULE(message.get("game_id"))
+            self.log.clear()
             self.log.append("🔄 Host started a rematch!")
             self.redraw()
         elif kind == "turn":
@@ -162,8 +170,23 @@ class ClientSession:
         elif kind == "error":
             self.say(message.get("message", "Invalid action"), error=True)
         elif kind == "end":
+            msg_text = message.get("message", "")
+            if "Host returned to menu" in msg_text or "Not enough players" in msg_text:
+                self.match_ended = False
+                with self.screen_lock:
+                    print(paint(f"\n  ℹ️ {msg_text}", "1;33"))
+                    print(paint("  Returning to main menu...", "2"))
+                self.over.set()
+                return
             play_sound("win")
+            self.match_ended = True
+            self.turn_event.clear()
             self.show_final(message)
+        elif kind == "host_exit":
+            self.match_ended = False
+            with self.screen_lock:
+                print(paint(f"\n  ℹ️ {message.get('message', 'Host returned to main menu.')}", "1;33"))
+                print(paint("  Returning to main menu...", "2"))
             self.over.set()
 
     def receive_loop(self):
@@ -235,16 +258,45 @@ class ClientSession:
         self.send({"type": "join", "name": self.name})
         thread = threading.Thread(target=self.receive_loop, daemon=True)
         thread.start()
-        while not self.over.is_set():
-            if self.turn_event.wait(0.2):
-                self.ask_move()
-        thread.join(timeout=1.0)
-        if self.started:
-            flush_stdin()
-            try:
-                input()
-            except (KeyboardInterrupt, EOFError):
-                pass
+        try:
+            while not self.over.is_set():
+                if self.turn_event.wait(0.15):
+                    self.ask_move()
+                elif self.match_ended:
+                    # Match finished; wait for host to trigger rematch, or allow client to press Q to quit
+                    key = read_direct_key(timeout=0.2)
+                    if key is not None:
+                        key_str = str(key).strip().upper()
+                        if key_str in {"Q", "!FF", "QUIT", "EXIT"}:
+                            self.over.set()
+                            try:
+                                self.send({"type": "surrender"})
+                            except OSError:
+                                pass
+                            break
+                        elif str(key).startswith("!"):
+                            try:
+                                self.send({"type": "chat", "text": str(key)[1:].strip()})
+                            except OSError:
+                                pass
+                elif not self.started:
+                    # Lobby waiting room
+                    key = read_direct_key(timeout=0.2)
+                    if key is not None:
+                        key_str = str(key).strip().upper()
+                        if key_str == "R":
+                            try:
+                                self.send({"type": "ready"})
+                            except OSError:
+                                pass
+                        elif key_str in {"Q", "!FF", "QUIT", "EXIT"}:
+                            self.over.set()
+                            break
+        except KeyboardInterrupt:
+            self.over.set()
+        finally:
+            self.over.set()
+            thread.join(timeout=0.5)
 
 
 def join_lan_game():

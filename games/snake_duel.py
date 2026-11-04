@@ -14,6 +14,9 @@ direct_input = True
 
 ARENA_WIDTH = 30
 ARENA_HEIGHT = 14
+POINTS_PER_FRUIT = 10
+TARGET_SCORE = 50
+INITIAL_SNAKE_LENGTH = 2
 
 DIRS = {
     "W": (0, -1),   # Up
@@ -48,6 +51,7 @@ def create_state(player_sessions):
     trails = {}
     alive = {}
     lengths = {}
+    scores = {}
 
     p1_start = (5, ARENA_HEIGHT // 2)
     p2_start = (ARENA_WIDTH - 6, ARENA_HEIGHT // 2)
@@ -66,7 +70,8 @@ def create_state(player_sessions):
         directions[pid] = d
         trails[pid] = [pos]
         alive[pid] = True
-        lengths[pid] = 1
+        lengths[pid] = INITIAL_SNAKE_LENGTH
+        scores[pid] = 0
 
     pellet = spawn_pellet(trails, p1_start, p2_start)
 
@@ -77,10 +82,12 @@ def create_state(player_sessions):
         "trails": trails,
         "alive": alive,
         "lengths": lengths,
+        "scores": scores,
+        "target_score": TARGET_SCORE,
         "pellet": pellet,
         "turn_index": 0,
         "winner": None,
-        "log": ["⚡ Lightcycle engines ignited! Trap your rival without crashing!"]
+        "log": [f"🐍 Arena active! Eat 🍎 fruits to grow. First to reach {TARGET_SCORE} pts without crashing wins!"]
     }
 
 
@@ -100,6 +107,8 @@ def view_for(state, player_id):
     alive = {int(k): v for k, v in raw_alive.items()} if isinstance(raw_alive, dict) else {}
     raw_len = state.get("lengths", {})
     lengths = {int(k): v for k, v in raw_len.items()} if isinstance(raw_len, dict) else {}
+    raw_scores = state.get("scores", {})
+    scores = {int(k): v for k, v in raw_scores.items()} if isinstance(raw_scores, dict) else {}
     raw_trails = state.get("trails", {})
     trails = {int(k): [tuple(c) for c in v] for k, v in raw_trails.items()} if isinstance(raw_trails, dict) else {}
     raw_dirs = state.get("directions", {})
@@ -115,6 +124,8 @@ def view_for(state, player_id):
         "trails": trails,
         "alive": alive,
         "lengths": lengths,
+        "scores": scores,
+        "target_score": state.get("target_score", TARGET_SCORE),
         "pellet": tuple(state["pellet"]) if state.get("pellet") else None,
         "turn_id": current_player(state),
         "winner": state["winner"],
@@ -169,6 +180,9 @@ def apply_action(state, player_id, cmd):
 
     log_entries = []
 
+    # Check energy fruit at destination
+    eats_fruit = (state.get("pellet") and next_pos == tuple(state["pellet"]))
+
     # Check collisions
     crashed = False
     crash_reason = ""
@@ -177,31 +191,55 @@ def apply_action(state, player_id, cmd):
     if not (0 <= next_x < ARENA_WIDTH and 0 <= next_y < ARENA_HEIGHT):
         crashed = True
         crash_reason = "crashed into the boundary wall!"
-    # 2. Own trail collision
-    elif next_pos in state["trails"][player_id]:
-        crashed = True
-        crash_reason = "collided with their own light trail!"
-    # 3. Opponent trail collision
-    elif next_pos in state["trails"].get(opp_id, []):
-        crashed = True
-        crash_reason = f"slammed into {opp_name}'s light wall!"
+    else:
+        # Determine own occupied body tiles (tail vacates if slithering without fruit)
+        curr_trail = state["trails"].get(player_id, [])
+        curr_len = state["lengths"].get(player_id, INITIAL_SNAKE_LENGTH)
+        if not eats_fruit and len(curr_trail) >= curr_len:
+            own_body = curr_trail[1:]
+        else:
+            own_body = curr_trail
+
+        # 2. Own body collision
+        if next_pos in own_body:
+            crashed = True
+            crash_reason = "collided with their own snake body!"
+        # 3. Opponent body collision
+        elif next_pos in state["trails"].get(opp_id, []):
+            crashed = True
+            crash_reason = f"slammed into {opp_name}'s snake body!"
+        # 4. Head-on collision
+        elif next_pos == state["positions"].get(opp_id):
+            crashed = True
+            crash_reason = f"collided head-on with {opp_name}!"
 
     if crashed:
         state["alive"][player_id] = False
         state["winner"] = [opp_name]
-        log_entries.append(f"💥 EXPLOSION! {p_name} {crash_reason}")
+        log_entries.append(f"💥 CRASH! {p_name} {crash_reason}")
         log_entries.append(f"🏆 {opp_name} survives and WINS the Snake Duel!")
     else:
         state["positions"][player_id] = next_pos
         state["trails"][player_id].append(next_pos)
 
-        # Check energy pellet
-        if state.get("pellet") and next_pos == tuple(state["pellet"]):
-            state["lengths"][player_id] = state["lengths"].get(player_id, 1) + 2
-            log_entries.append(f"⭐ {p_name} absorbed an Energy Orb! Speed & trail expanded!")
-            state["pellet"] = spawn_pellet(state["trails"], state["positions"][player_id], state["positions"][opp_id])
+        if eats_fruit:
+            state["lengths"][player_id] = state["lengths"].get(player_id, INITIAL_SNAKE_LENGTH) + 1
+            state["scores"][player_id] = state["scores"].get(player_id, 0) + POINTS_PER_FRUIT
+            curr_score = state["scores"][player_id]
+            target = state.get("target_score", TARGET_SCORE)
+            log_entries.append(f"🍎 {p_name} ate a fruit! (+{POINTS_PER_FRUIT} pts) -> Total: {curr_score}/{target} pts | Length: {state['lengths'][player_id]}")
+
+            # Win condition: reaching target point without crashing
+            if curr_score >= target:
+                state["winner"] = [p_name]
+                log_entries.append(f"🏆 TARGET REACHED! {p_name} scored {curr_score} pts without crashing and WINS! 🎉")
+            else:
+                state["pellet"] = spawn_pellet(state["trails"], state["positions"][player_id], state["positions"][opp_id])
         else:
-            log_entries.append(f"🏎️ {p_name} steered {cmd} to ({next_x}, {next_y}).")
+            # Slither forward by trimming the tail to snake length
+            while len(state["trails"][player_id]) > state["lengths"].get(player_id, INITIAL_SNAKE_LENGTH):
+                state["trails"][player_id].pop(0)
+            log_entries.append(f"🐍 {p_name} steered {cmd} to ({next_x}, {next_y}).")
 
     state["turn_index"] += 1
     state["log"].extend(log_entries)
@@ -212,16 +250,34 @@ def apply_action(state, player_id, cmd):
 
 
 def is_over(state):
-    return state["winner"] is not None or not all(state.get("alive", {}).values())
+    if state.get("winner") is not None:
+        return True
+    if not all(state.get("alive", {}).values()):
+        return True
+    target = state.get("target_score", TARGET_SCORE)
+    for pid, sc in state.get("scores", {}).items():
+        if sc >= target:
+            return True
+    return False
 
 
 def get_winner(state):
-    if state["winner"]:
+    if state.get("winner"):
         return state["winner"]
     if is_over(state):
-        for p in state["players"]:
-            if state["alive"].get(p["id"], False):
-                return [p["name"]]
+        alive_players = [p for p in state["players"] if state.get("alive", {}).get(p["id"], False)]
+        if len(alive_players) == 1:
+            return [alive_players[0]["name"]]
+        p1 = state["players"][0]
+        p2 = state["players"][1]
+        sc1 = state.get("scores", {}).get(p1["id"], 0)
+        sc2 = state.get("scores", {}).get(p2["id"], 0)
+        if sc1 > sc2:
+            return [p1["name"]]
+        elif sc2 > sc1:
+            return [p2["name"]]
+        else:
+            return []
     return []
 
 
@@ -261,7 +317,7 @@ def _render_arena(positions, directions, trails, alive, pellet, players):
             elif pt == p2_head and alive.get(p2["id"], True):
                 row_cells.append(paint(f"{p2_icon} ", "1;30;46"))  # P2 Head (Black on Cyan)
             elif pt == pellet:
-                row_cells.append(paint("★ ", "1;33"))              # Energy Pellet
+                row_cells.append("🍎")                              # Energy Fruit (2 columns wide)
             elif pt in t1_set:
                 row_cells.append(paint("■ ", "1;33"))              # P1 Trail
             elif pt in t2_set:
@@ -287,6 +343,9 @@ def render_dashboard(view):
     alive = {int(k): v for k, v in raw_alive.items()} if isinstance(raw_alive, dict) else {}
     raw_len = view.get("lengths", {})
     lengths = {int(k): v for k, v in raw_len.items()} if isinstance(raw_len, dict) else {}
+    raw_sc = view.get("scores", {})
+    scores = {int(k): v for k, v in raw_sc.items()} if isinstance(raw_sc, dict) else {}
+    target_score = view.get("target_score", TARGET_SCORE)
     pellet = tuple(view["pellet"]) if view.get("pellet") else None
     turn_id = view.get("turn_id")
     my_id = view.get("player_id")
@@ -295,6 +354,7 @@ def render_dashboard(view):
     out = [
         paint("=" * 66, "1;36"),
         paint("               ⚡ S N A K E   D U E L ⚡", "1;36"),
+        paint(f"   🎯 TARGET POINT TO WIN: {target_score} PTS WITHOUT CRASHING! (🍎 = +{POINTS_PER_FRUIT} pts)   ", "1;37;44"),
         paint("=" * 66, "1;36"),
         ""
     ]
@@ -305,8 +365,16 @@ def render_dashboard(view):
     st1 = paint("ALIVE", "1;32") if alive.get(p1["id"], True) else paint("CRASHED", "1;31")
     st2 = paint("ALIVE", "1;32") if alive.get(p2["id"], True) else paint("CRASHED", "1;31")
 
-    out.append(f"  [P1] {p1['name']:<12}: Status: {st1} | Trail Length: {len(trails.get(p1['id'], []))}")
-    out.append(f"  [P2] {p2['name']:<12}: Status: {st2} | Trail Length: {len(trails.get(p2['id'], []))}")
+    sc1 = scores.get(p1["id"], 0)
+    sc2 = scores.get(p2["id"], 0)
+    len1 = len(trails.get(p1["id"], []))
+    len2 = len(trails.get(p2["id"], []))
+
+    p1_active = " ▶" if turn_id == p1["id"] else "  "
+    p2_active = " ▶" if turn_id == p2["id"] else "  "
+
+    out.append(f"{p1_active} [P1] {p1['name']:<12}: Status: {st1} | Score: {paint(f'{sc1}/{target_score}', '1;33')} pts | Length: {len1}")
+    out.append(f"{p2_active} [P2] {p2['name']:<12}: Status: {st2} | Score: {paint(f'{sc2}/{target_score}', '1;36')} pts | Length: {len2}")
     out.append("")
 
     # Arena
@@ -328,8 +396,19 @@ def render_dashboard(view):
 
 def render_final(view, message, winners):
     parts = [render_dashboard(view), ""]
+    raw_sc = view.get("scores", {})
+    scores = {int(k): v for k, v in raw_sc.items()} if isinstance(raw_sc, dict) else {}
+    target_score = view.get("target_score", TARGET_SCORE)
+    players = view.get("players", [])
+
     if winners:
-        parts.append(paint(f"  🏆  VICTORY! Champion: {', '.join(winners)}!  🏆", "1;32"))
+        winner_name = ", ".join(winners)
+        parts.append(paint(f"  🏆  VICTORY! Champion: {winner_name}!  🏆", "1;32"))
     else:
-        parts.append(paint("  Both Lightcycles crashed in a head-on tie!", "1;33"))
+        parts.append(paint("  Both snakes crashed in a head-on tie!", "1;33"))
+
+    score_summary = "  Final Scores: " + "  vs  ".join(
+        f"{p['name']}: {scores.get(p['id'], 0)}/{target_score} pts" for p in players
+    )
+    parts.append(paint(score_summary, "1;36"))
     return "\n".join(parts)

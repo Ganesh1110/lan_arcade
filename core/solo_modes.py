@@ -885,10 +885,10 @@ def _get_best_snake_duel_move(state, bot_id=1, human_like=False):
         if is_straight:
             score += 8.0
 
-        # Pellet attraction if safe
-        if pellet and space_count >= 6:
+        # Fruit attraction if safe
+        if pellet and space_count >= 5:
             p_dist = abs(nx - pellet[0]) + abs(ny - pellet[1])
-            score += max(0, 12 - p_dist)
+            score += max(0, 16 - p_dist * 2)
 
         # Early game spacing (first 3 turns): avoid charging straight into the opponent's midline
         trail_len = len(state["trails"].get(bot_id, []))
@@ -936,9 +936,26 @@ def run_snake_duel_vs_ai():
     clear_screen()
     v = snake_duel.view_for(state, 0)
     winners = snake_duel.get_winner(state)
-    msg = f"Arena Champion: {', '.join(winners)}!" if winners else "Mutual Crash!"
+    my_sc = state.get("scores", {}).get(0, 0)
+    bot_sc = state.get("scores", {}).get(1, 0)
+    target = state.get("target_score", snake_duel.TARGET_SCORE)
+
+    if winners and winners[0] == name:
+        if my_sc >= target:
+            msg = f"🎉 VICTORY! {name} reached the target {target} pts without crashing!"
+        else:
+            msg = f"🏆 VICTORY! TronBot crashed! {name} survives with {my_sc} pts!"
+        play_sound("win")
+        record_high_score("snake_duel", name, my_sc, f"{my_sc} pts (Target: {target})")
+    elif winners and "TronBot" in winners[0]:
+        if bot_sc >= target:
+            msg = f"🤖 TronBot reached {target} pts first! You were outscored ({my_sc} vs {bot_sc})!"
+        else:
+            msg = f"💥 You crashed! TronBot wins the duel ({my_sc} vs {bot_sc})!"
+    else:
+        msg = f"Arena tie! (Final score: You {my_sc} - {bot_sc} TronBot)"
+
     print(snake_duel.render_final(v, msg, winners))
-    play_sound("win")
     record_match_outcome("Snake Duel (vs Bot)", [name, "TronBot ⚡"], winners)
     input("\nPress Enter to return to solo menu...")
 

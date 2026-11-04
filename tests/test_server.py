@@ -77,5 +77,68 @@ class TestServerInit(unittest.TestCase):
             sys.stdout.flush()
 
 
+class MockSocket:
+    def __init__(self):
+        self.sent_bytes = b""
+
+    def sendall(self, data):
+        self.sent_bytes += data
+
+    def close(self):
+        pass
+
+
+class TestRematchFlow(unittest.TestCase):
+    def test_client_rematch_lifecycle(self):
+        from core.client import ClientSession
+        mock_sock = MockSocket()
+        session = ClientSession(mock_sock, "JoinedPlayer")
+
+        # 1. Join and game start
+        session.handle({"type": "joined", "player_id": 1, "name": "JoinedPlayer"})
+        self.assertEqual(session.my_id, 1)
+
+        start_msg = {
+            "type": "start",
+            "game_id": "connect4",
+            "you": 1,
+            "name": "JoinedPlayer",
+            "view": {},
+            "players": [{"id": 0, "name": "HostUser"}, {"id": 1, "name": "JoinedPlayer"}]
+        }
+        session.handle(start_msg)
+        self.assertTrue(session.started)
+        self.assertFalse(session.match_ended)
+        self.assertFalse(session.over.is_set())
+
+        # 2. Match completes
+        end_msg = {
+            "type": "end",
+            "message": "Winner(s): HostUser",
+            "winners": ["HostUser"],
+            "players": [{"id": 0, "name": "HostUser"}, {"id": 1, "name": "JoinedPlayer"}]
+        }
+        session.handle(end_msg)
+        self.assertTrue(session.match_ended)
+        # Client MUST NOT terminate connection on match end so rematch can happen!
+        self.assertFalse(session.over.is_set())
+
+        # 3. Host triggers rematch
+        rematch_msg = {"type": "rematch", "message": "Host initiated a rematch!"}
+        session.handle(rematch_msg)
+        self.assertFalse(session.match_ended)
+        self.assertFalse(session.over.is_set())
+
+        # 4. New round begins
+        session.handle(start_msg)
+        self.assertTrue(session.started)
+        self.assertFalse(session.match_ended)
+        self.assertFalse(session.over.is_set())
+
+        # 5. Host returns to main menu
+        session.handle({"type": "host_exit", "message": "Host returned to main menu."})
+        self.assertTrue(session.over.is_set())
+
+
 if __name__ == "__main__":
     unittest.main()
