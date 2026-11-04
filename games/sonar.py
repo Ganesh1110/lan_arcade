@@ -90,12 +90,16 @@ def view_for(state, player_id):
     # My tracking map of enemy coordinates
     my_shots = {}
     if player_id in state.get("shots_history", {}):
-        for k_str, val in state["shots_history"][player_id].items():
-            coord = eval(k_str) if isinstance(k_str, str) and "(" in k_str else k_str
-            if isinstance(coord, (tuple, list)):
-                my_shots[f"{coord[0]},{coord[1]}"] = val
-            else:
-                my_shots[str(coord)] = val
+        for k_val, val in state["shots_history"][player_id].items():
+            if isinstance(k_val, (tuple, list)) and len(k_val) == 2:
+                my_shots[f"{k_val[0]},{k_val[1]}"] = val
+            elif isinstance(k_val, str):
+                clean = k_val.strip("() ")
+                parts = [p.strip() for p in clean.split(",") if p.strip()]
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    my_shots[f"{parts[0]},{parts[1]}"] = val
+                else:
+                    my_shots[k_val] = val
 
     return {
         "player_id": player_id,
@@ -140,6 +144,9 @@ def parse_action(state_or_view, player_id, raw_input):
 
     # 2. SONAR
     if cmd in {"SONAR", "PING", "P"}:
+        rem_pings = state_or_view.get("pings", {}).get(player_id, state_or_view.get("my_pings", 3))
+        if rem_pings <= 0:
+            return False, "No sonar pings remaining! Acoustic pings depleted (0 left)."
         if len(parts) < 2:
             return False, "Specify column (A–H) or row (1–8) for sonar ping (e.g. 'SONAR E' or 'SONAR 4')."
         target = parts[1]
@@ -149,6 +156,9 @@ def parse_action(state_or_view, player_id, raw_input):
 
     # 3. TORPEDO
     if cmd in {"TORPEDO", "FIRE", "SHOOT", "T"}:
+        rem_torps = state_or_view.get("torpedoes", {}).get(player_id, state_or_view.get("my_torpedoes", 4))
+        if rem_torps <= 0:
+            return False, "No torpedoes remaining! Munitions depleted (0 left)."
         if len(parts) < 2:
             return False, "Specify coordinate for torpedo launch (e.g. 'TORPEDO E4')."
         coord = parse_coord(parts[1])
@@ -159,6 +169,9 @@ def parse_action(state_or_view, player_id, raw_input):
     # Direct coordinate shorthand e.g. "E4"
     coord = parse_coord(cmd)
     if coord:
+        rem_torps = state_or_view.get("torpedoes", {}).get(player_id, state_or_view.get("my_torpedoes", 4))
+        if rem_torps <= 0:
+            return False, "No torpedoes remaining! Munitions depleted (0 left)."
         return True, {"action": "torpedo", "coord": coord, "text": cmd}
 
     # 4. SILENT RUNNING
@@ -192,6 +205,8 @@ def apply_action(state, player_id, action_data):
 
     # 2. SONAR
     elif act == "sonar":
+        if state["pings"].get(player_id, 0) <= 0:
+            return {"log": [f"⚠️ {p_name} has 0 sonar pings remaining!"]}
         target = action_data["target"]
         opp_r, opp_c = state["positions"][opp_id]
         detected = False
@@ -212,6 +227,8 @@ def apply_action(state, player_id, action_data):
 
     # 3. TORPEDO
     elif act == "torpedo":
+        if state["torpedoes"].get(player_id, 0) <= 0:
+            return {"log": [f"⚠️ {p_name} has 0 torpedoes remaining!"]}
         coord = action_data["coord"]
         tr, tc = coord
         coord_txt = action_data.get("text", to_coord(tr, tc))

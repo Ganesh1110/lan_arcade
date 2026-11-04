@@ -156,7 +156,9 @@ def calc_score(word):
         return 2
     if l == 6:
         return 3
-    return 5
+    if l == 7:
+        return 5
+    return 11  # Official Boggle rules: 8+ letter words score 11 points
 
 
 def apply_action(state, player_id, word):

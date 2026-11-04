@@ -234,23 +234,43 @@ def apply_action(state, player_id, typed_text):
     p_name = curr_p["name"]
 
     expected = get_current_snippet(state)
+    typed_clean = str(typed_text).strip()
 
-    acc = calculate_accuracy(expected, typed_text)
+    # Calculate WPM based on turn duration
+    now = time.time()
+    start_t = state.get("turn_start_time", now)
+    elapsed = max(0.5, now - start_t)
+    state["turn_start_time"] = time.time()
+
+    acc = calculate_accuracy(expected, str(typed_text))
     gain = 0
     log_entries = []
+
+    # Calculate WPM if reasonable accuracy
+    if acc >= 50.0 and len(typed_clean) > 0:
+        wpm = round((len(typed_clean) / 5.0) / (elapsed / 60.0))
+        state["wpm_records"][player_id] = max(state["wpm_records"].get(player_id, 0), wpm)
+    else:
+        wpm = 0
+
+    wpm_stat = f" ({wpm} WPM)" if wpm > 0 else ""
 
     if acc >= 90.0:
         gain = 35
         state["progress"][player_id] = min(WINNING_PROGRESS, state["progress"].get(player_id, 0) + gain)
-        log_entries.append(f"⚡ {p_name} typed with {acc}% accuracy! +{gain}% Nitro boost!")
+        log_entries.append(f"⚡ {p_name} typed with {acc}% accuracy{wpm_stat}! +{gain}% Nitro boost!")
     elif acc >= 60.0:
         gain = 20
         state["progress"][player_id] = min(WINNING_PROGRESS, state["progress"].get(player_id, 0) + gain)
-        log_entries.append(f"🚗 {p_name} typed with {acc}% accuracy! +{gain}% forward move.")
-    else:
+        log_entries.append(f"🚗 {p_name} typed with {acc}% accuracy{wpm_stat}! +{gain}% forward move.")
+    elif acc >= 50.0 and len(typed_clean) > 0:
         gain = 5
         state["progress"][player_id] = min(WINNING_PROGRESS, state["progress"].get(player_id, 0) + gain)
         log_entries.append(f"⚠️ {p_name} had typos ({acc}% accuracy). Stumbled forward +{gain}%.")
+    else:
+        # Empty or random entry earns 0% progress
+        gain = 0
+        log_entries.append(f"❌ {p_name} submitted inaccurate/empty input ({acc}% accuracy). 0% progress!")
 
     if state["progress"][player_id] >= WINNING_PROGRESS:
         state["winner"] = [p_name]
@@ -289,6 +309,8 @@ def render_dashboard(view):
     players = view.get("players", [])
     raw_prog = view.get("progress", {})
     progress = {int(k): v for k, v in raw_prog.items()} if isinstance(raw_prog, dict) else {}
+    raw_wpm = view.get("wpm_records", {})
+    wpm = {int(k): v for k, v in raw_wpm.items()} if isinstance(raw_wpm, dict) else {}
     target_snip = view.get("target_snippet", "Hello World")
     turn_id = view.get("turn_id")
     my_id = view.get("player_id")
@@ -319,7 +341,8 @@ def render_dashboard(view):
         ptr = paint("▶", "1;32") if is_turn else " "
         name_tag = paint(f"{p_name:<12}", "1;33") if pid == my_id else f"{p_name:<12}"
 
-        out.append(f"  {ptr} Lane {p.get('lane', 1)}: [{name_tag}] |{track_bar}| {prog:3d}% 🏁")
+        wpm_val = wpm.get(pid, 0)
+        out.append(f"  {ptr} Lane {p.get('lane', 1)}: [{name_tag}] |{track_bar}| {prog:3d}% ({wpm_val} WPM) 🏁")
 
     out.append("")
 

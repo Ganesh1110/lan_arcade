@@ -32,9 +32,28 @@ HEAD_ICONS = {
 }
 
 
-def spawn_pellet(trails, p1_pos, p2_pos):
-    """Find empty arena cell for energy pellet."""
-    occupied = set(trails.get(0, [])) | set(trails.get(1, [])) | {p1_pos, p2_pos}
+def spawn_pellet(trails, *extra_positions):
+    """Find empty arena cell for energy pellet, dynamically checking all snake trails and positions."""
+    occupied = set()
+    if isinstance(trails, dict):
+        for t_list in trails.values():
+            occupied.update(t_list)
+    elif isinstance(trails, (list, tuple, set)):
+        occupied.update(trails)
+
+    for item in extra_positions:
+        if isinstance(item, dict):
+            occupied.update(item.values())
+        elif isinstance(item, (list, tuple, set)):
+            if len(item) == 2 and isinstance(item[0], int) and isinstance(item[1], int):
+                occupied.add(tuple(item))
+            else:
+                for sub in item:
+                    if isinstance(sub, tuple):
+                        occupied.add(sub)
+                    elif isinstance(sub, dict):
+                        occupied.update(sub.values())
+
     candidates = [
         (x, y) for x in range(1, ARENA_WIDTH - 1)
         for y in range(1, ARENA_HEIGHT - 1)

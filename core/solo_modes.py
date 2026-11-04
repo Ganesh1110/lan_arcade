@@ -1018,20 +1018,8 @@ BLACK_OPENING_BOOK = {
 
 
 def _get_best_chess_move(board, moves_history=None, human_like=False):
-    legal_moves = []
-    for r1 in range(8):
-        for c1 in range(8):
-            p = board[r1][c1]
-            if p is not None and chess_game.is_black_piece(p):
-                for r2 in range(8):
-                    for c2 in range(8):
-                        valid, err = chess_game.is_valid_piece_move(board, r1, c1, r2, c2, False)
-                        if valid:
-                            tb = copy.deepcopy(board)
-                            tb[r2][c2] = tb[r1][c1]
-                            tb[r1][c1] = None
-                            if not chess_game.is_king_in_check(tb, False):
-                                legal_moves.append(((r1, c1), (r2, c2)))
+    legal_moves_dicts = chess_game.get_legal_moves(board, False)
+    legal_moves = [(m["from"], m["to"]) for m in legal_moves_dicts]
     if not legal_moves:
         return None
 
@@ -1180,13 +1168,23 @@ def run_chess_vs_ai():
             if bot_move:
                 chess_game.apply_action(state, 1, bot_move)
             else:
-                # Checkmate / Stalemate
+                # Checkmate or Stalemate when bot has no legal moves
+                if chess_game.is_king_in_check(state["board"], False):
+                    state["winner"] = [name]
+                else:
+                    state["winner"] = []
                 break
 
     clear_screen()
     v = chess_game.view_for(state, 0)
     winners = chess_game.get_winner(state)
-    msg = f"Checkmate! Winner: {', '.join(winners)}!" if winners else "Game Drawn / Concluded."
+    if winners and name in winners:
+        msg = f"🏆 CHECKMATE! {name} defeated ChessBot!"
+        play_sound("win")
+    elif winners:
+        msg = "💀 DEFEAT! ChessBot checkmated you!"
+    else:
+        msg = "🤝 Match drawn by stalemate!"
     print(chess_game.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Chess (vs Bot)", [name, "ChessBot ♟️"], winners)

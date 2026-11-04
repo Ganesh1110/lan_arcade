@@ -39,20 +39,28 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
 - **Host-Authoritative Architecture**: The host machine manages game state, move validation, turn progression, and scoring.
 - **Privacy Enforcement**: Private game information (e.g., secret word in Hangman, hidden fleets in Battleship) is strictly filtered before being sent to individual player clients.
 - **Unified Game Framework**: All games share the same TCP networking, room management, lobby system, and message protocol.
-- **13 Supported Games**:
+- **21 Supported Games**:
   1. **Bingo 1–25** (2–4 Players) - Number calling, complete line detection, solo vs PC mode, local pass-and-play.
   2. **Connect Four** (2 Players) - Classic 6x7 strategy board game.
   3. **Battleship** (2 Players) - Hidden 5x5 grids and coordinate targeting.
   4. **Dots and Boxes** (2–4 Players) - Connect grid dots to claim boxes and earn extra turns.
   5. **Tic-Tac-Toe** (2 Players) - Classic 3x3 strategy grid game.
-  6. **Hangman** (2 Players) - Word Master sets secret phrase; Guesser tries to guess letters with visual gallows.
+  6. **Hangman** (2 Players) - Word Master sets secret word/phrase; Guesser tries to guess letters with visual gallows.
   7. **Word Chain / Shiritori** (2–4 Players) - Word association with 3 lives per player.
   8. **2048 Versus** (2 Players) - Competitive 4x4 tile-merging race to the 2048 tile.
   9. **Boggle / Word Hunt** (2–4 Players) - 4x4 grid letter search.
-  10. **Mini Crossword Race** (2 Players) - 5x5 speed crossword.
+  10. **Mini Crossword Race** (2 Players) - 5x5 speed crossword with Across and Down clues.
   11. **Wordoku** (2 Players) - 6x6 mini Sudoku deduction.
   12. **Anagram Showdown** (2–4 Players) - 7-letter speed anagram solver.
   13. **Snake & Ladders** (2–4 Players) - Classic 1–100 board game with ladders, snakes, dice rolling, extra turn on 6, and exact 100 roll win.
+  14. **Wordle Duel** (2 Players) - 5-letter word guessing with color feedback.
+  15. **Scrabble Sprint** (2 Players) - Speed word formation from letter racks.
+  16. **Quiz Show** (2–4 Players) - Trivia competition across tech, CS, science, and pop culture.
+  17. **Typing Racer** (2–4 Players) - Multiplayer speed typing race with real-time accuracy and WPM.
+  18. **Artillery Duel** (2 Players) - Turn-based ballistic trajectories with wind and destructible terrain.
+  19. **Snake Duel** (2 Players) - Tron-style grid slither duel with fruit growth.
+  20. **Chess** (2 Players) - Full 8x8 standard chess with checkmate, castling, en passant, and promotion.
+  21. **Arrow Man Duel** (2 Players) - Turn-based bowman archery duel with dynamic wind, special quivers, and randomized tower elevations.
 - **In-Game Forfeit / Surrender & Live Chat**: Any player can type `!ff` / `!surrender` / `!giveup` / `!quit` at any time to forfeit a match, or `! <message>` to chat with room players.
 - **Zero External Dependencies**: Runs entirely on Python 3.9+ standard library.
 

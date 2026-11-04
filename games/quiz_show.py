@@ -96,8 +96,52 @@ QUESTION_BANK = [
         "options": ["Python", "Java", "Ruby", "Kotlin"],
         "answer": "B",
         "fact": "James Gosling originally named Java after an oak tree outside his office."
+    },
+    {
+        "category": "💻 Computer Science",
+        "question": "Which layer of the OSI model does IP (Internet Protocol) operate on?",
+        "options": ["Data Link (Layer 2)", "Network (Layer 3)", "Transport (Layer 4)", "Application (Layer 7)"],
+        "answer": "B",
+        "fact": "The Network layer (Layer 3) handles packet routing and logical IP addressing."
+    },
+    {
+        "category": "🐍 Python",
+        "question": "What is the output of bool([]) in Python?",
+        "options": ["True", "False", "None", "TypeError"],
+        "answer": "B",
+        "fact": "Empty collections, None, and 0 evaluate to False in Python truth testing."
+    },
+    {
+        "category": "🌐 Networking & Web",
+        "question": "Which HTTP status code signifies 'Unauthorized'?",
+        "options": ["200", "401", "403", "404"],
+        "answer": "B",
+        "fact": "HTTP 401 means Unauthorized (missing or invalid authentication credentials)."
+    },
+    {
+        "category": "🚀 Tech & Hardware",
+        "question": "Which type of memory is volatile and loses its contents when powered off?",
+        "options": ["ROM", "NVMe SSD", "RAM", "Flash Memory"],
+        "answer": "C",
+        "fact": "RAM (Random Access Memory) requires continuous power to hold data."
+    },
+    {
+        "category": "🐧 Linux & OS",
+        "question": "What is PID 1 in modern Linux systems traditionally assigned to?",
+        "options": ["bash", "systemd or init", "kernel", "sshd"],
+        "answer": "B",
+        "fact": "PID 1 is the first userspace process spawned during Linux boot."
+    },
+    {
+        "category": "🧠 AI & Data",
+        "question": "Which activation function outputs values strictly in the range (0, 1)?",
+        "options": ["ReLU", "Sigmoid", "Tanh", "LeakyReLU"],
+        "answer": "B",
+        "fact": "The Sigmoid function maps real inputs to the range (0, 1)."
     }
 ]
+
+QUESTIONS_PER_PLAYER = 3
 
 
 def create_state(player_sessions):
@@ -112,10 +156,20 @@ def create_state(player_sessions):
         scores[pid] = 0
         streaks[pid] = 0
 
-    # Pick 8 random questions
+    # Ensure perfectly balanced turns for all players (4 each for 2 players, 3 each for 3+ players)
+    if len(players) == 2:
+        total_q_count = TOTAL_ROUNDS
+    else:
+        total_q_count = len(players) * 3
     questions = list(QUESTION_BANK)
     random.shuffle(questions)
-    selected_questions = questions[:TOTAL_ROUNDS]
+    # If more questions needed than bank, cycle through
+    selected_questions = []
+    while len(selected_questions) < total_q_count:
+        for q in questions:
+            selected_questions.append(q)
+            if len(selected_questions) == total_q_count:
+                break
 
     return {
         "players": players,
@@ -138,7 +192,13 @@ def view_for(state, player_id):
     p_data = next((p for p in state["players"] if p["id"] == player_id), None)
     curr_q = None
     if state["current_round"] < len(state["questions"]):
-        curr_q = state["questions"][state["current_round"]]
+        q = state["questions"][state["current_round"]]
+        # Sanitize question to prevent leaking answer key to clients
+        curr_q = {
+            "category": q["category"],
+            "question": q["question"],
+            "options": q["options"]
+        }
 
     # Normalize scores with integer keys
     raw_scores = state.get("scores", {})

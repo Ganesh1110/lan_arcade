@@ -155,7 +155,7 @@ def parse_action(state_or_view, player_id, raw_input):
     except ValueError:
         return False, "Angle and Power must be numbers (e.g. '45 70')."
 
-    if not (0 <= angle <= 90 or 90 <= angle <= 180):
+    if not (0 <= angle <= 90):
         return False, f"Angle must be between 0° and 90° (elevation), received {angle}°."
     if not (1 <= power <= 100):
         return False, f"Power must be between 1 and 100, received {power}."
@@ -375,7 +375,18 @@ def apply_action(state, player_id, action_data):
         s2 = state["round_wins"].get(p2_id, 0)
         log_entries.append(f"   ➔ Standings: {state['players'][0]['name']} [{s1}] — [{s2}] {state['players'][1]['name']}")
 
-        if curr_round < tot_rounds:
+        # Clinch match if a player achieves 2 round wins, or after 3 rounds
+        if s1 >= 2 or s2 >= 2 or curr_round >= tot_rounds:
+            if s1 > s2:
+                state["winner"] = [state["players"][0]["name"]]
+                log_entries.append(f"🏆 MATCH CHAMPION! {state['players'][0]['name']} reigns supreme ({s1} - {s2})!")
+            elif s2 > s1:
+                state["winner"] = [state["players"][1]["name"]]
+                log_entries.append(f"🏆 MATCH CHAMPION! {state['players'][1]['name']} reigns supreme ({s2} - {s1})!")
+            else:
+                state["winner"] = []
+                log_entries.append(f"🤝 DUEL TIED! Both archers drew the match ({s1} - {s2})!")
+        else:
             state["round"] = curr_round + 1
             # Re-randomize positions and elevations for the next round
             state["positions"][p1_id] = random.randint(6, 14)
@@ -398,17 +409,6 @@ def apply_action(state, player_id, action_data):
             next_start_idx = (state["round"] - 1) % len(state["players"])
             state["turn_index"] = next_start_idx
             log_entries.append(f"🏹 Starting Round {state['round']} of {tot_rounds}! Towers relocated to new positions!")
-        else:
-            # All rounds complete
-            if s1 > s2:
-                state["winner"] = [state["players"][0]["name"]]
-                log_entries.append(f"🏆 MATCH CHAMPION! {state['players'][0]['name']} reigns supreme ({s1} - {s2})!")
-            elif s2 > s1:
-                state["winner"] = [state["players"][1]["name"]]
-                log_entries.append(f"🏆 MATCH CHAMPION! {state['players'][1]['name']} reigns supreme ({s2} - {s1})!")
-            else:
-                state["winner"] = []
-                log_entries.append(f"🤝 DUEL TIED! Both archers drew the match ({s1} - {s2})!")
     else:
         state["turn_index"] += 1
 

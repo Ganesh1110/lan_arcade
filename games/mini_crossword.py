@@ -17,44 +17,64 @@ PUZZLES = [
         "theme": "Everyday Tech & Nature",
         "grid": ["APPLE", "LOGIC", "SMART", "CODES", "TRAIN"],
         "clues": {
-            "1A": ("Row 1 (5 letters)", "Red orchard fruit or tech giant", "APPLE"),
-            "2A": ("Row 2 (5 letters)", "Reasoning principles or boolean gates", "LOGIC"),
-            "3A": ("Row 3 (5 letters)", "Clever and quick-witted", "SMART"),
-            "4A": ("Row 4 (5 letters)", "Written programs or secret ciphers", "CODES"),
-            "5A": ("Row 5 (5 letters)", "Locomotive on railway tracks", "TRAIN")
+            "1A": ("Row 1", "Red orchard fruit or tech giant", "APPLE"),
+            "2A": ("Row 2", "Reasoning principles or boolean gates", "LOGIC"),
+            "3A": ("Row 3", "Clever and quick-witted", "SMART"),
+            "4A": ("Row 4", "Written programs or secret ciphers", "CODES"),
+            "5A": ("Row 5", "Locomotive on railway tracks", "TRAIN"),
+            "1D": ("Col 1", "Down letters: A-L-S-C-T", "ALSCT"),
+            "2D": ("Col 2", "Down letters: P-O-M-O-R", "POMOR"),
+            "3D": ("Col 3", "Down letters: P-G-A-D-A", "PGADA"),
+            "4D": ("Col 4", "Down letters: L-I-R-E-I", "LIREI"),
+            "5D": ("Col 5", "Down letters: E-C-T-S-N", "ECTSN"),
         }
     },
     {
         "theme": "Space & Cosmic Elements",
         "grid": ["SOLAR", "ORBIT", "COMET", "EARTH", "SPACE"],
         "clues": {
-            "1A": ("Row 1 (5 letters)", "Pertaining to our sun or radiation", "SOLAR"),
-            "2A": ("Row 2 (5 letters)", "Curved gravitational path of a planet", "ORBIT"),
-            "3A": ("Row 3 (5 letters)", "Icy celestial body with a glowing tail", "COMET"),
-            "4A": ("Row 4 (5 letters)", "Our home blue marble planet", "EARTH"),
-            "5A": ("Row 5 (5 letters)", "The infinite final frontier", "SPACE")
+            "1A": ("Row 1", "Pertaining to our sun or radiation", "SOLAR"),
+            "2A": ("Row 2", "Curved gravitational path of a planet", "ORBIT"),
+            "3A": ("Row 3", "Icy celestial body with a glowing tail", "COMET"),
+            "4A": ("Row 4", "Our home blue marble planet", "EARTH"),
+            "5A": ("Row 5", "The infinite final frontier", "SPACE"),
+            "1D": ("Col 1", "Down letters: S-O-C-E-S", "SOCES"),
+            "2D": ("Col 2", "Down letters: O-R-O-A-P", "OROAP"),
+            "3D": ("Col 3", "Down letters: L-B-M-R-A", "LBMRA"),
+            "4D": ("Col 4", "Down letters: A-I-E-T-C", "AIETC"),
+            "5D": ("Col 5", "Down letters: R-T-T-H-E", "RTTHE"),
         }
     },
     {
         "theme": "Ocean & Wilderness",
         "grid": ["OCEAN", "CORAL", "TIGER", "RIVER", "BEACH"],
         "clues": {
-            "1A": ("Row 1 (5 letters)", "Vast body of saltwater covering Earth", "OCEAN"),
-            "2A": ("Row 2 (5 letters)", "Marine reef-building invertebrate colony", "CORAL"),
-            "3A": ("Row 3 (5 letters)", "Striped apex jungle feline", "TIGER"),
-            "4A": ("Row 4 (5 letters)", "Flowing freshwater natural stream", "RIVER"),
-            "5A": ("Row 5 (5 letters)", "Sandy coastal strip by the waves", "BEACH")
+            "1A": ("Row 1", "Vast body of saltwater covering Earth", "OCEAN"),
+            "2A": ("Row 2", "Marine reef-building invertebrate colony", "CORAL"),
+            "3A": ("Row 3", "Striped apex jungle feline", "TIGER"),
+            "4A": ("Row 4", "Flowing freshwater natural stream", "RIVER"),
+            "5A": ("Row 5", "Sandy coastal strip by the waves", "BEACH"),
+            "1D": ("Col 1", "Down letters: O-C-T-R-B", "OCTRB"),
+            "2D": ("Col 2", "Down letters: C-O-I-I-E", "COIIE"),
+            "3D": ("Col 3", "Down letters: E-R-G-V-A", "ERGVA"),
+            "4D": ("Col 4", "Down letters: A-A-E-E-C", "AAEEC"),
+            "5D": ("Col 5", "Down letters: N-L-R-R-H", "NLRRH"),
         }
     },
     {
         "theme": "College & Campus Life",
         "grid": ["BOOKS", "STUDY", "GRADE", "LEARN", "CLASS"],
         "clues": {
-            "1A": ("Row 1 (5 letters)", "Bound pages in the university library", "BOOKS"),
-            "2A": ("Row 2 (5 letters)", "Review materials before midterms", "STUDY"),
-            "3A": ("Row 3 (5 letters)", "Letter mark from A to F on an exam", "GRADE"),
-            "4A": ("Row 4 (5 letters)", "Acquire new knowledge or skill", "LEARN"),
-            "5A": ("Row 5 (5 letters)", "Lecture session in a hall", "CLASS")
+            "1A": ("Row 1", "Bound pages in the university library", "BOOKS"),
+            "2A": ("Row 2", "Review materials before midterms", "STUDY"),
+            "3A": ("Row 3", "Letter mark from A to F on an exam", "GRADE"),
+            "4A": ("Row 4", "Acquire new knowledge or skill", "LEARN"),
+            "5A": ("Row 5", "Lecture session in a hall", "CLASS"),
+            "1D": ("Col 1", "Down letters: B-S-G-L-C", "BSGLC"),
+            "2D": ("Col 2", "Down letters: O-T-R-E-L", "OTREL"),
+            "3D": ("Col 3", "Down letters: O-U-A-A-A", "OUAAA"),
+            "4D": ("Col 4", "Down letters: K-D-D-R-S", "KDDRS"),
+            "5D": ("Col 5", "Down letters: S-Y-E-N-S", "SYENS"),
         }
     }
 ]
@@ -121,13 +141,13 @@ def view_for(state, player_id):
 
 
 def prompt_for(state_or_view, player_id):
-    return "Enter clue and word (e.g. '1A APPLE' or '3A SMART')"
+    return "Enter clue and word, e.g. Across '1A APPLE' or Down '1D ALSCT'"
 
 
 def parse_action(state_or_view, player_id, raw_input):
     parts = str(raw_input).strip().upper().split()
     if len(parts) != 2:
-        return False, "Format: '<clue_num> <word>' (e.g. '1A APPLE' or '3A SMART')."
+        return False, "Format: '<clue_num> <word>' (e.g. '1A APPLE' or '1D ALSCT')."
 
     clue, word = parts[0], parts[1]
 
@@ -136,7 +156,7 @@ def parse_action(state_or_view, player_id, raw_input):
     clues_map = puzzle["clues"] if puzzle else state_or_view.get("clues", CLUES_ACROSS)
 
     if clue not in clues_map:
-        return False, f"Invalid clue '{clue}'. Choose from 1A to 5A."
+        return False, f"Invalid clue '{clue}'. Choose Across (1A–5A) or Down (1D–5D)."
 
     if len(word) != 5 or not word.isalpha():
         return False, "Word must be 5 letters long."
@@ -147,16 +167,20 @@ def parse_action(state_or_view, player_id, raw_input):
 def apply_action(state, player_id, action):
     curr_p = next(p for p in state["players"] if p["id"] == player_id)
     clue, word = action["clue"], action["word"]
-    row_idx = int(clue[0]) - 1
+    idx = int(clue[0]) - 1
 
     puzzle = state.get("puzzle", PUZZLES[0])
     expected_word = puzzle["clues"][clue][2]
     log_entries = []
 
     if word == expected_word:
-        # Fill row on player's board
-        for c in range(GRID_SIZE):
-            state["boards"][player_id][row_idx][c] = word[c]
+        # Fill row (Across) or column (Down) on player's board
+        if clue.endswith("A"):
+            for c in range(GRID_SIZE):
+                state["boards"][player_id][idx][c] = word[c]
+        elif clue.endswith("D"):
+            for r in range(GRID_SIZE):
+                state["boards"][player_id][r][idx] = word[r]
 
         # Calculate solved rows
         solved = sum(
@@ -218,6 +242,8 @@ def render_dashboard(view):
     mid_b = "       ├───┼───┼───┼───┼───┤"
     bot_b = "       └───┴───┴───┴───┴───┘"
 
+    col_hdr = "        1D  2D  3D  4D  5D"
+    out.append(paint(col_hdr, "1;33"))
     out.append(top_b)
     for r in range(GRID_SIZE):
         row_str = [f"    {r + 1}A │"]
@@ -234,15 +260,24 @@ def render_dashboard(view):
             out.append(bot_b)
 
     out.append("")
-    out.append("  CLUES (ACROSS):")
-    if clues:
-        for clue_id, clue_info in sorted(clues.items()):
+    all_clues = clues if clues else CLUES_ACROSS
+    across_clues = {k: v for k, v in all_clues.items() if k.endswith("A")}
+    down_clues = {k: v for k, v in all_clues.items() if k.endswith("D")}
+
+    if across_clues:
+        out.append("  CLUES (ACROSS):")
+        for clue_id, clue_info in sorted(across_clues.items()):
             desc = clue_info[0] if isinstance(clue_info, (list, tuple)) else ""
             txt = clue_info[1] if isinstance(clue_info, (list, tuple)) and len(clue_info) > 1 else str(clue_info)
             out.append(f"   {paint(clue_id, '1;36')}: {txt} ({desc})")
-    else:
-        for clue_id, (desc, txt, _) in sorted(CLUES_ACROSS.items()):
-            out.append(f"   {paint(clue_id, '1;36')}: {txt} ({desc})")
+
+    if down_clues:
+        out.append("")
+        out.append("  CLUES (DOWN):")
+        for clue_id, clue_info in sorted(down_clues.items()):
+            desc = clue_info[0] if isinstance(clue_info, (list, tuple)) else ""
+            txt = clue_info[1] if isinstance(clue_info, (list, tuple)) and len(clue_info) > 1 else str(clue_info)
+            out.append(f"   {paint(clue_id, '1;35')}: {txt} ({desc})")
 
     if log:
         out.append("")

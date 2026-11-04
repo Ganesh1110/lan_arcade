@@ -93,6 +93,9 @@ def apply_action(state, player_id, word):
     req = state["required_letter"]
     used = state["used_words"]
 
+    actives_before = active_players(state)
+    curr_active_idx = next((i for i, p in enumerate(actives_before) if p["id"] == player_id), 0)
+
     if word == "PASS":
         state["lives"][player_id] -= 1
         rem = state["lives"][player_id]
@@ -100,7 +103,6 @@ def apply_action(state, player_id, word):
             log_entries.append(f"🏳️ {p_name} passed the turn → Forfeited 1 Life! ({rem} ❤️ left)")
         else:
             log_entries.append(f"💀 {p_name} passed the turn with 0 Lives left! ELIMINATED!")
-        state["turn_index"] += 1
     elif req and not word.startswith(req):
         state["lives"][player_id] -= 1
         rem = state["lives"][player_id]
@@ -112,7 +114,6 @@ def apply_action(state, player_id, word):
             log_entries.append(
                 f"💀 {p_name} played '{word}' (Wrong starting letter! Required '{req}') → 0 Lives left! ELIMINATED!"
             )
-        state["turn_index"] += 1
     elif word in used:
         state["lives"][player_id] -= 1
         rem = state["lives"][player_id]
@@ -124,7 +125,6 @@ def apply_action(state, player_id, word):
             log_entries.append(
                 f"💀 {p_name} played '{word}' (Already used word!) → 0 Lives left! ELIMINATED!"
             )
-        state["turn_index"] += 1
     elif not is_valid_word(word):
         state["lives"][player_id] -= 1
         rem = state["lives"][player_id]
@@ -136,12 +136,19 @@ def apply_action(state, player_id, word):
             log_entries.append(
                 f"💀 {p_name} played '{word}' (Not in English dictionary!) → 0 Lives left! ELIMINATED!"
             )
-        state["turn_index"] += 1
     else:
         state["used_words"].add(word)
         state["last_word"] = word
         state["required_letter"] = word[-1]
         log_entries.append(f"🔤 {p_name} played '{word}' → Next word must start with '{word[-1]}'")
+
+    # Advance turn order: if player was eliminated, do not skip the next active player
+    was_eliminated = (state["lives"][player_id] <= 0)
+    actives_after = active_players(state)
+
+    if was_eliminated and actives_after:
+        state["turn_index"] = curr_active_idx % len(actives_after)
+    else:
         state["turn_index"] += 1
 
     actives = active_players(state)
@@ -171,8 +178,12 @@ def get_winner(state):
 
 def skip_player(state, player_id):
     if current_player(state) == player_id:
+        actives = active_players(state)
+        curr_idx = next((i for i, p in enumerate(actives) if p["id"] == player_id), 0)
         state["lives"][player_id] = 0
-        state["turn_index"] += 1
+        new_actives = active_players(state)
+        if new_actives:
+            state["turn_index"] = curr_idx % len(new_actives)
 
 
 def render_dashboard(view):

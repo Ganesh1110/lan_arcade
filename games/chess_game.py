@@ -93,8 +93,73 @@ def is_path_clear(board, r1, c1, r2, c2):
     return True
 
 
-def is_valid_piece_move(board, r1, c1, r2, c2, is_white):
-    """Validate movement rules according to piece geometry."""
+def is_square_attacked(board, target_r, target_c, by_white):
+    """Check whether square (target_r, target_c) is under attack by pieces of by_white color."""
+    pawn_char = "P" if by_white else "p"
+    knight_char = "N" if by_white else "n"
+    bishop_char = "B" if by_white else "b"
+    rook_char = "R" if by_white else "r"
+    queen_char = "Q" if by_white else "q"
+    king_char = "K" if by_white else "k"
+
+    # 1. Pawn attacks
+    # If attacked by white, white pawns come from row target_r + 1
+    pawn_dr = 1 if by_white else -1
+    pr = target_r + pawn_dr
+    if 0 <= pr < 8:
+        for pc in [target_c - 1, target_c + 1]:
+            if 0 <= pc < 8 and board[pr][pc] == pawn_char:
+                return True
+
+    # 2. Knight attacks
+    knight_offsets = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
+    for dr, dc in knight_offsets:
+        nr, nc = target_r + dr, target_c + dc
+        if 0 <= nr < 8 and 0 <= nc < 8 and board[nr][nc] == knight_char:
+            return True
+
+    # 3. King attacks (adjacent 1 square)
+    for dr in [-1, 0, 1]:
+        for dc in [-1, 0, 1]:
+            if dr == 0 and dc == 0:
+                continue
+            kr, kc = target_r + dr, target_c + dc
+            if 0 <= kr < 8 and 0 <= kc < 8 and board[kr][kc] == king_char:
+                return True
+
+    # 4. Straight line attacks (Rook, Queen)
+    for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        step = 1
+        while True:
+            rr, rc = target_r + dr * step, target_c + dc * step
+            if not (0 <= rr < 8 and 0 <= rc < 8):
+                break
+            sq_piece = board[rr][rc]
+            if sq_piece is not None:
+                if sq_piece == rook_char or sq_piece == queen_char:
+                    return True
+                break
+            step += 1
+
+    # 5. Diagonal line attacks (Bishop, Queen)
+    for dr, dc in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+        step = 1
+        while True:
+            br, bc = target_r + dr * step, target_c + dc * step
+            if not (0 <= br < 8 and 0 <= bc < 8):
+                break
+            sq_piece = board[br][bc]
+            if sq_piece is not None:
+                if sq_piece == bishop_char or sq_piece == queen_char:
+                    return True
+                break
+            step += 1
+
+    return False
+
+
+def is_valid_piece_move(board, r1, c1, r2, c2, is_white, state=None):
+    """Validate movement rules according to piece geometry, castling, and en passant."""
     piece = board[r1][c1]
     if piece is None:
         return False, "No piece at starting square."
@@ -125,6 +190,10 @@ def is_valid_piece_move(board, r1, c1, r2, c2, is_white):
         # Diagonal capture
         if abs(dc) == 1 and dr == direction and target is not None:
             return True, None
+        # En Passant
+        if abs(dc) == 1 and dr == direction and target is None:
+            if state and state.get("en_passant_target") == (r2, c2):
+                return True, None
         return False, "Invalid pawn move."
 
     # --- KNIGHT ---
@@ -161,9 +230,47 @@ def is_valid_piece_move(board, r1, c1, r2, c2, is_white):
 
     # --- KING ---
     elif p_upper == "K":
+        # Normal 1 square step
         if max(abs(dr), abs(dc)) == 1:
             return True, None
-        return False, "Kings can only move 1 square in any direction."
+
+        # Castling
+        if dr == 0 and abs(dc) == 2:
+            rank = 7 if is_white else 0
+            if r1 != rank:
+                return False, "Castling is only allowed from king's starting rank."
+            has_moved = state.get("has_moved", {}) if isinstance(state, dict) else {}
+            king_key = "K" if is_white else "k"
+            if has_moved.get(king_key, False):
+                return False, "King has already moved; castling unavailable."
+            if is_king_in_check(board, is_white):
+                return False, "Cannot castle out of CHECK."
+
+            # Kingside (O-O)
+            if dc == 2:
+                r_key = "R_h1" if is_white else "r_h8"
+                expected_rook = "R" if is_white else "r"
+                if has_moved.get(r_key, False) or board[rank][7] != expected_rook:
+                    return False, "Kingside rook has moved or is absent."
+                if board[rank][5] is not None or board[rank][6] is not None:
+                    return False, "Path between king and kingside rook is blocked."
+                if is_square_attacked(board, rank, 5, not is_white) or is_square_attacked(board, rank, 6, not is_white):
+                    return False, "Cannot castle through or into a square under attack."
+                return True, None
+
+            # Queenside (O-O-O)
+            elif dc == -2:
+                r_key = "R_a1" if is_white else "r_a8"
+                expected_rook = "R" if is_white else "r"
+                if has_moved.get(r_key, False) or board[rank][0] != expected_rook:
+                    return False, "Queenside rook has moved or is absent."
+                if board[rank][1] is not None or board[rank][2] is not None or board[rank][3] is not None:
+                    return False, "Path between king and queenside rook is blocked."
+                if is_square_attacked(board, rank, 3, not is_white) or is_square_attacked(board, rank, 2, not is_white):
+                    return False, "Cannot castle through or into a square under attack."
+                return True, None
+
+        return False, "Kings move 1 square in any direction, or 2 squares to castle."
 
     return False, "Unknown piece move."
 
@@ -183,24 +290,51 @@ def is_king_in_check(board, is_white):
     k_pos = find_king(board, is_white)
     if not k_pos:
         return True  # King captured
-    kr, kc = k_pos
+    return is_square_attacked(board, k_pos[0], k_pos[1], not is_white)
 
-    # Check if any enemy piece can attack the king
-    enemy_is_white = not is_white
-    for r in range(8):
-        for c in range(8):
-            piece = board[r][c]
-            if piece is None:
+
+def get_legal_moves(board, is_white, state=None):
+    """Generate all strictly legal moves for the given side (king left out of check)."""
+    legal_moves = []
+    for r1 in range(8):
+        for c1 in range(8):
+            p = board[r1][c1]
+            if p is None:
                 continue
-            if is_white and is_black_piece(piece):
-                valid, _ = is_valid_piece_move(board, r, c, kr, kc, enemy_is_white)
-                if valid:
-                    return True
-            elif not is_white and is_white_piece(piece):
-                valid, _ = is_valid_piece_move(board, r, c, kr, kc, enemy_is_white)
-                if valid:
-                    return True
-    return False
+            if is_white and not is_white_piece(p):
+                continue
+            if not is_white and not is_black_piece(p):
+                continue
+
+            for r2 in range(8):
+                for c2 in range(8):
+                    valid, _ = is_valid_piece_move(board, r1, c1, r2, c2, is_white, state)
+                    if not valid:
+                        continue
+
+                    # Simulate move
+                    tb = copy.deepcopy(board)
+                    moving_p = tb[r1][c1]
+                    tb[r2][c2] = moving_p
+                    tb[r1][c1] = None
+
+                    # Simulate en passant capture removal
+                    if moving_p.upper() == "P" and state and state.get("en_passant_target") == (r2, c2) and abs(c2 - c1) == 1:
+                        tb[r1][c2] = None
+
+                    # Simulate castling rook movement
+                    if moving_p.upper() == "K" and abs(c2 - c1) == 2:
+                        if c2 == 6:
+                            tb[r1][5] = tb[r1][7]
+                            tb[r1][7] = None
+                        elif c2 == 2:
+                            tb[r1][3] = tb[r1][0]
+                            tb[r1][0] = None
+
+                    if not is_king_in_check(tb, is_white):
+                        legal_moves.append({"from": (r1, c1), "to": (r2, c2)})
+
+    return legal_moves
 
 
 def create_state(player_sessions):
@@ -216,6 +350,8 @@ def create_state(player_sessions):
         "players": players,
         "board": initial_board(),
         "turn_index": 0,
+        "has_moved": {"K": False, "k": False, "R_a1": False, "R_h1": False, "r_a8": False, "r_h8": False},
+        "en_passant_target": None,
         "captured_white": [],  # Black pieces captured by White
         "captured_black": [],  # White pieces captured by Black
         "moves_history": [],
@@ -247,62 +383,111 @@ def view_for(state, player_id):
         "captured_black": state["captured_black"],
         "moves_history": state["moves_history"],
         "in_check": state.get("in_check", False),
+        "has_moved": state.get("has_moved", {}),
+        "en_passant_target": state.get("en_passant_target"),
         "winner": state["winner"],
         "log": state["log"]
     }
 
 
 def prompt_for(state_or_view, player_id):
-    return "Enter move in coordinates, e.g. 'e2e4', 'e2-e4', or 'Nf3'"
+    return "Enter move: 'e2e4', 'e2-e4', 'Nf3', 'O-O' (castle), or 'e7e8q' (promotion)"
 
 
 def parse_action(state_or_view, player_id, raw_input):
-    cleaned = str(raw_input).strip().replace(" ", "").replace("-", "").replace("to", "").lower()
-    if len(cleaned) < 4:
-        return False, "Move format must be e.g. 'e2e4' or 'e2-e4'."
-
-    from_str = cleaned[:2]
-    to_str = cleaned[2:4]
-
-    c1 = parse_coord(from_str)
-    c2 = parse_coord(to_str)
-
-    if not c1 or not c2:
-        return False, f"Invalid coordinates '{from_str}' -> '{to_str}' (files a–h, ranks 1–8)."
-
-    if c1 == c2:
-        return False, "Starting and destination squares cannot be identical."
+    raw = str(raw_input).strip()
+    if not raw:
+        return False, "Move cannot be empty."
 
     board = state_or_view.get("board") if isinstance(state_or_view, dict) else state_or_view.state["board"]
-    r1, col1 = c1
-    r2, col2 = c2
-
-    # Verify whose turn it is
     players = state_or_view.get("players", [])
     p_white = players[0]["id"] if players else 0
     is_white_turn = (player_id == p_white)
 
-    piece = board[r1][col1]
-    if piece is None:
-        return False, f"There is no piece on {from_str.upper()}."
+    legal_moves = get_legal_moves(board, is_white_turn, state_or_view)
+    if not legal_moves:
+        return False, "No legal moves available."
 
-    if is_white_turn and not is_white_piece(piece):
-        return False, f"It is White's turn, but {from_str.upper()} holds a Black piece."
-    if not is_white_turn and not is_black_piece(piece):
-        return False, f"It is Black's turn, but {from_str.upper()} holds a White piece."
+    candidate = None
+    prom_choice = "Q"
 
-    valid, err = is_valid_piece_move(board, r1, col1, r2, col2, is_white_turn)
-    if not valid:
-        return False, err
+    # 1. Castling shorthand
+    if raw.upper() in {"O-O", "0-0"}:
+        rank = 7 if is_white_turn else 0
+        candidate = {"from": (rank, 4), "to": (rank, 6)}
+    elif raw.upper() in {"O-O-O", "0-0-0"}:
+        rank = 7 if is_white_turn else 0
+        candidate = {"from": (rank, 4), "to": (rank, 2)}
+    else:
+        # Check promotion suffix e.g. e7e8=Q or e7e8q
+        clean_raw = raw.replace(" ", "").replace("-", "").replace("to", "")
+        if "=" in clean_raw:
+            parts = clean_raw.split("=")
+            clean_raw = parts[0]
+            if len(parts) > 1 and parts[1].upper() in {"Q", "R", "B", "N"}:
+                prom_choice = parts[1].upper()
+        elif len(clean_raw) == 5 and clean_raw[4].upper() in {"Q", "R", "B", "N"}:
+            prom_choice = clean_raw[4].upper()
+            clean_raw = clean_raw[:4]
 
-    # Ensure move does not leave King in check
-    temp_board = copy.deepcopy(board)
-    temp_board[r2][col2] = temp_board[r1][col1]
-    temp_board[r1][col1] = None
-    if is_king_in_check(temp_board, is_white_turn):
+        # 2. Coordinate format e.g. 'e2e4'
+        if len(clean_raw) == 4:
+            from_str = clean_raw[:2].lower()
+            to_str = clean_raw[2:4].lower()
+            c1 = parse_coord(from_str)
+            c2 = parse_coord(to_str)
+            if c1 and c2:
+                candidate = {"from": c1, "to": c2}
+
+        # 3. Standard Algebraic Notation (SAN) e.g. 'Nf3', 'e4', 'Bxf7', 'Qh5', 'exd5'
+        if not candidate:
+            san = raw.replace("+", "").replace("#", "").replace("x", "").replace("X", "").strip()
+            if len(san) >= 2:
+                target_str = san[-2:].lower()
+                c2 = parse_coord(target_str)
+                if c2:
+                    piece_type = san[0].upper() if san[0].isupper() else "P"
+                    disambig = san[1:-2].lower() if san[0].isupper() else san[:-2].lower()
+
+                    matches = []
+                    for m in legal_moves:
+                        if m["to"] == c2:
+                            r1, col1 = m["from"]
+                            p = board[r1][col1]
+                            if p and p.upper() == piece_type:
+                                # Check disambiguation (file or rank)
+                                if disambig:
+                                    f_char = FILES[col1]
+                                    r_char = str(8 - r1)
+                                    if disambig not in (f_char, r_char, f"{f_char}{r_char}"):
+                                        continue
+                                matches.append(m)
+
+                    if len(matches) == 1:
+                        candidate = matches[0]
+                    elif len(matches) > 1:
+                        return False, f"Ambiguous move '{raw}'. Specify starting square (e.g. 'Nbd2')."
+
+    if not candidate:
+        return False, f"Could not parse chess move '{raw}'. Use e.g. 'e2e4', 'Nf3', or 'O-O'."
+
+    # Verify candidate is strictly legal
+    r1, col1 = candidate["from"]
+    r2, col2 = candidate["to"]
+    is_legal = any(m["from"] == (r1, col1) and m["to"] == (r2, col2) for m in legal_moves)
+
+    if not is_legal:
+        valid_geom, err = is_valid_piece_move(board, r1, col1, r2, col2, is_white_turn, state_or_view)
+        if not valid_geom:
+            return False, err or "Illegal move."
         return False, "Illegal move: King would be in CHECK."
 
-    return True, {"from": (r1, col1), "to": (r2, col2), "notation": f"{from_str}{to_str}"}
+    return True, {
+        "from": (r1, col1),
+        "to": (r2, col2),
+        "promotion": prom_choice,
+        "notation": f"{to_coord(r1, col1)}{to_coord(r2, col2)}"
+    }
 
 
 def apply_action(state, player_id, action_data):
@@ -313,63 +498,110 @@ def apply_action(state, player_id, action_data):
     target = board[r2][c2]
 
     curr_p = next(p for p in state["players"] if p["id"] == player_id)
+    opp = next(p for p in state["players"] if p["id"] != player_id)
     p_name = curr_p["name"]
+    opp_name = opp["name"]
     is_white = (curr_p["side"] == "White")
+    log_entries = []
 
-    # Handle capture
-    captured_name = None
+    # Handle En Passant capture
+    if piece.upper() == "P" and state.get("en_passant_target") == (r2, c2) and target is None and abs(c2 - c1) == 1:
+        ep_r = r1
+        ep_c = c2
+        target = board[ep_r][ep_c]
+        board[ep_r][ep_c] = None
+
+    # Handle Castling rook movement
+    if piece.upper() == "K" and abs(c2 - c1) == 2:
+        if c2 == 6:  # Kingside
+            board[r1][5] = board[r1][7]
+            board[r1][7] = None
+            state.setdefault("has_moved", {})["R_h1" if is_white else "r_h8"] = True
+        elif c2 == 2:  # Queenside
+            board[r1][3] = board[r1][0]
+            board[r1][0] = None
+            state.setdefault("has_moved", {})["R_a1" if is_white else "r_a8"] = True
+
+    # Handle Capture logging and collection
     if target is not None:
-        captured_name = target
         if is_white:
             state["captured_white"].append(target)
         else:
             state["captured_black"].append(target)
 
-    # Move piece
+    # Move piece to destination
     board[r2][c2] = piece
     board[r1][c1] = None
 
-    # Pawn Promotion (Auto-promote to Queen)
+    # Pawn Promotion
     promoted = False
+    prom_piece = action_data.get("promotion", "Q").upper()
     if piece == "P" and r2 == 0:
-        board[r2][c2] = "Q"
+        board[r2][c2] = prom_piece
         promoted = True
     elif piece == "p" and r2 == 7:
-        board[r2][c2] = "q"
+        board[r2][c2] = prom_piece.lower()
         promoted = True
+
+    # Update en_passant_target for double-step pawn advance
+    direction = -1 if is_white else 1
+    if piece.upper() == "P" and abs(r2 - r1) == 2:
+        state["en_passant_target"] = (r1 + direction, c1)
+    else:
+        state["en_passant_target"] = None
+
+    # Update has_moved tracking
+    if piece == "K":
+        state.setdefault("has_moved", {})["K"] = True
+    elif piece == "k":
+        state.setdefault("has_moved", {})["k"] = True
+    elif (r1, c1) == (7, 0):
+        state.setdefault("has_moved", {})["R_a1"] = True
+    elif (r1, c1) == (7, 7):
+        state.setdefault("has_moved", {})["R_h1"] = True
+    elif (r1, c1) == (0, 0):
+        state.setdefault("has_moved", {})["r_a8"] = True
+    elif (r1, c1) == (0, 7):
+        state.setdefault("has_moved", {})["r_h8"] = True
 
     # Record notation
     notat = f"{to_coord(r1, c1)}➔{to_coord(r2, c2)}"
     if target:
         notat += f" (x{target.upper()})"
     if promoted:
-        notat += "=Q"
+        notat += f"={prom_piece}"
 
     state["moves_history"].append(f"{curr_p['side'][:1]}: {notat}")
 
-    # Check opponent check status
+    # Check opponent check / checkmate / stalemate status
     opp_is_white = not is_white
+    opp_moves = get_legal_moves(board, opp_is_white, state)
     opp_in_check = is_king_in_check(board, opp_is_white)
     state["in_check"] = opp_in_check
 
-    log_entry = f"♟ {p_name} ({curr_p['side']}) played {notat}."
+    move_log = f"♟ {p_name} ({curr_p['side']}) played {notat}."
     if opp_in_check:
-        log_entry += " ⚠️ CHECK!"
+        move_log += " ⚠️ CHECK!"
+    log_entries.append(move_log)
 
-    state["log"].append(log_entry)
+    if not opp_moves:
+        if opp_in_check:
+            state["winner"] = [p_name]
+            log_entries.append(f"🏆 CHECKMATE! {p_name} ({curr_p['side']}) wins the game!")
+        else:
+            state["winner"] = []
+            log_entries.append(f"🤝 STALEMATE! {opp_name} has no legal moves. Match is drawn.")
+
     state["turn_index"] += 1
+    state["log"].extend(log_entries)
+    if len(state["log"]) > 8:
+        state["log"] = state["log"][-8:]
 
-    # Check if king was captured (end game condition)
-    opp_king = find_king(board, opp_is_white)
-    if not opp_king:
-        state["winner"] = [p_name]
-        state["log"].append(f"🏆 {p_name} captures the King and WINS by checkmate!")
-
-    return {"log": [log_entry]}
+    return {"log": log_entries}
 
 
 def is_over(state):
-    return state["winner"] is not None
+    return state.get("winner") is not None
 
 
 def get_winner(state):

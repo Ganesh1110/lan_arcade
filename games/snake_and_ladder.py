@@ -12,7 +12,7 @@ max_players = 4
 
 # Classic Ladders mapping: start -> end
 LADDERS = {
-    1: 38,
+    2: 38,
     4: 14,
     9: 31,
     21: 42,

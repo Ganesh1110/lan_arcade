@@ -2,6 +2,7 @@
 Wordoku (6x6 Mini Sudoku) Game Module.
 2-Player Competitive Deductive Grid Game.
 """
+import re
 import random
 from config import paint
 
@@ -26,7 +27,7 @@ PUZZLES = [
         "initial": [
             ["A", None, "C", None, "E", None],
             [None, "E", None, "A", None, "C"],
-            ["B", None, None, "E", None, "D"],
+            ["B", "C", None, "E", None, "D"],
             ["E", None, "D", None, None, "A"],
             [None, "A", None, "F", None, "E"],
             [None, "D", None, "C", None, "B"]
@@ -42,12 +43,12 @@ PUZZLES = [
             ["A", "C", "B", "D", "F", "E"]
         ],
         "initial": [
-            [None, "E", None, "C", None, "A"],
+            ["F", "E", None, "C", None, "A"],
             ["C", None, "A", None, "E", None],
-            [None, "D", None, None, "A", "C"],
+            ["E", "D", None, None, "A", "C"],
             ["B", "A", None, None, "D", None],
             [None, "F", None, "A", None, "B"],
-            ["A", None, "B", None, "F", None]
+            ["A", None, "B", None, "F", "E"]
         ]
     },
     {
@@ -62,7 +63,7 @@ PUZZLES = [
         "initial": [
             ["B", None, "A", None, "F", None],
             [None, "F", None, "B", None, "A"],
-            ["A", None, None, "D", None, "F"],
+            ["A", "B", None, "D", None, "F"],
             ["D", None, "F", None, None, "C"],
             [None, "D", None, "C", None, "B"],
             [None, "A", None, "F", None, "E"]
@@ -73,6 +74,36 @@ PUZZLES = [
 # Legacy fallbacks
 SOLUTION = PUZZLES[0]["solution"]
 INITIAL_PUZZLE = PUZZLES[0]["initial"]
+
+
+def is_valid_placement(grid, r, c, val):
+    for i in range(GRID_SIZE):
+        if grid[r][i] == val or grid[i][c] == val:
+            return False
+    br = (r // 2) * 2
+    bc = (c // 3) * 3
+    for dr in range(2):
+        for dc in range(3):
+            if grid[br + dr][bc + dc] == val:
+                return False
+    return True
+
+
+def has_solution(grid):
+    """Backtracking solver verifying if grid has at least one valid completion."""
+    def backtrack(g):
+        for r in range(GRID_SIZE):
+            for c in range(GRID_SIZE):
+                if g[r][c] is None:
+                    for v in ["A", "B", "C", "D", "E", "F"]:
+                        if is_valid_placement(g, r, c, v):
+                            g[r][c] = v
+                            if backtrack(g):
+                                return True
+                            g[r][c] = None
+                    return False
+        return True
+    return backtrack([row[:] for row in grid])
 
 
 def create_state(player_sessions):
@@ -126,23 +157,17 @@ def prompt_for(state_or_view, player_id):
 
 
 def parse_action(state_or_view, player_id, raw_input):
-    text = str(raw_input).strip().upper().replace("R", "").replace("C", "")
-    parts = text.split()
-    if len(parts) != 3:
-        return False, "Format: 'R<row> C<col> <letter>' (e.g. 'R1 C2 B')."
+    raw = str(raw_input).strip().upper()
+    # Match inputs like: 'R1 C2 B', '1 2 C', 'R1C2 C', '1, 2, C', 'r1 c2 c'
+    m = re.match(r'^(?:R\s*)?([1-6])[\s,]+(?:C\s*)?([1-6])[\s,]+([A-F])$', raw)
+    if not m:
+        m = re.match(r'^R([1-6])\s*C([1-6])[\s,]+([A-F])$', raw)
+    if not m:
+        return False, "Format: 'R<row> C<col> <letter>' (e.g. 'R1 C2 B' or '1 2 C')."
 
-    try:
-        r = int(parts[0]) - 1
-        c = int(parts[1]) - 1
-    except ValueError:
-        return False, "Row and Column must be numbers between 1 and 6."
-
-    val = parts[2]
-    if not (0 <= r < GRID_SIZE and 0 <= c < GRID_SIZE):
-        return False, "Row and Column must be between 1 and 6."
-
-    if val not in VALID_LETTERS:
-        return False, "Letter value must be A, B, C, D, E, or F."
+    r = int(m.group(1)) - 1
+    c = int(m.group(2)) - 1
+    val = m.group(3)
 
     grid = state_or_view.get("grid", [])
     if grid and grid[r][c] is not None:
@@ -159,7 +184,15 @@ def apply_action(state, player_id, action):
     expected_val = puzzle["solution"][r][c]
     log_entries = []
 
-    if val == expected_val:
+    # Valid if matches solution or is mathematically valid with a full solvable completion
+    is_correct = (val == expected_val)
+    if not is_correct and is_valid_placement(state["grid"], r, c, val):
+        test_g = [row[:] for row in state["grid"]]
+        test_g[r][c] = val
+        if has_solution(test_g):
+            is_correct = True
+
+    if is_correct:
         state["grid"][r][c] = val
         state["scores"][player_id] += 10
         state["empty_count"] -= 1
