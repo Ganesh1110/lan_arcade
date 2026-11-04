@@ -14,6 +14,10 @@ class TestArrowMan(unittest.TestCase):
         self.assertEqual(len(self.state["players"]), 2)
         self.assertEqual(self.state["hp"][0], 100)
         self.assertEqual(self.state["hp"][1], 100)
+        self.assertEqual(self.state["round"], 1)
+        self.assertEqual(self.state["total_rounds"], 3)
+        self.assertEqual(self.state["round_wins"][0], 0)
+        self.assertEqual(self.state["round_wins"][1], 0)
         self.assertTrue(self.state["apples"][0])
         self.assertTrue(self.state["apples"][1])
         self.assertEqual(self.state["quivers"][0]["fire"], 1)
@@ -62,10 +66,42 @@ class TestArrowMan(unittest.TestCase):
         arrow_man.apply_action(self.state, 0, {"angle": 45, "power": 60, "arrow": "fire"})
         self.assertEqual(self.state["quivers"][0]["fire"], 0)
 
-    def test_is_over_when_hp_zero(self):
+    def test_three_round_progression_and_position_switch(self):
+        # Round 1: set P2 HP low and fell P2
+        self.state["hp"][1] = 10
+        r1_p1_x = self.state["positions"][0]
+        r1_p2_x = self.state["positions"][1]
+
+        # Player 0 takes shot that damages P2
         self.state["hp"][1] = 0
+        # Trigger round check via action
+        arrow_man.apply_action(self.state, 0, {"angle": 45, "power": 70, "arrow": "standard"})
+
+        # Round 1 completed, should transition to Round 2
+        self.assertEqual(self.state["round"], 2)
+        self.assertEqual(self.state["round_wins"][0], 1)
+        self.assertEqual(self.state["round_wins"][1], 0)
+        self.assertEqual(self.state["hp"][0], 100)
+        self.assertEqual(self.state["hp"][1], 100)
+        self.assertFalse(arrow_man.is_over(self.state))
+
+        # Round 2: Fell P1 so P2 wins round 2
+        self.state["hp"][0] = 0
+        arrow_man.apply_action(self.state, 1, {"angle": 45, "power": 70, "arrow": "standard"})
+
+        self.assertEqual(self.state["round"], 3)
+        self.assertEqual(self.state["round_wins"][0], 1)
+        self.assertEqual(self.state["round_wins"][1], 1)
+        self.assertFalse(arrow_man.is_over(self.state))
+
+        # Round 3: Final round, P0 wins
+        self.state["hp"][1] = 0
+        arrow_man.apply_action(self.state, 0, {"angle": 45, "power": 70, "arrow": "standard"})
+
         self.assertTrue(arrow_man.is_over(self.state))
         self.assertEqual(arrow_man.get_winner(self.state), ["Archer1"])
+        self.assertEqual(self.state["round_wins"][0], 2)
+        self.assertEqual(self.state["round_wins"][1], 1)
 
     def test_randomized_positions_and_elevations(self):
         p1_positions = set()
@@ -103,6 +139,7 @@ class TestArrowMan(unittest.TestCase):
         v = arrow_man.view_for(self.state, 0)
         dashboard = arrow_man.render_dashboard(v)
         self.assertIn("A R R O W   M A N   D U E L", dashboard)
+        self.assertIn("ROUND 1 OF 3", dashboard)
         self.assertIn("Archer1", dashboard)
         self.assertIn("Archer2", dashboard)
         self.assertIn("100 HP", dashboard)

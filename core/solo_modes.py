@@ -1267,8 +1267,14 @@ def run_arrow_man_vs_ai():
 
     state = arrow_man.create_state([{"id": 0, "name": name}, {"id": 1, "name": "RobinBot 🏹"}])
     bot_shot_count = 0
+    last_round = 1
 
     while not arrow_man.is_over(state):
+        curr_round = state.get("round", 1)
+        if curr_round != last_round:
+            bot_shot_count = 0
+            last_round = curr_round
+
         curr_id = arrow_man.current_player(state)
         clear_screen()
         v = arrow_man.view_for(state, 0)
@@ -1302,15 +1308,16 @@ def run_arrow_man_vs_ai():
     clear_screen()
     v = arrow_man.view_for(state, 0)
     winners = arrow_man.get_winner(state)
-    my_hp = state["hp"].get(0, 0)
+    s1 = state.get("round_wins", {}).get(0, 0)
+    s2 = state.get("round_wins", {}).get(1, 0)
     if winners and winners[0] == name:
-        msg = f"🏆 VICTORY! {name} defeated RobinBot with {my_hp} HP remaining!"
+        msg = f"🏆 VICTORY! {name} defeated RobinBot ({s1} - {s2}) across {state.get('total_rounds', 3)} rounds!"
         play_sound("win")
-        record_high_score("arrow_man", name, my_hp, f"{my_hp} HP left")
+        record_high_score("arrow_man", name, s1 * 100, f"{s1}-{s2} match score")
     elif winners and "RobinBot" in winners[0]:
-        msg = "💀 DEFEAT! RobinBot felled you in battle!"
+        msg = f"💀 DEFEAT! RobinBot felled you ({s2} - {s1})!"
     else:
-        msg = "Archery duel ended in a draw!"
+        msg = f"Archery duel ended in a draw ({s1} - {s2})!"
 
     print(arrow_man.render_final(v, msg, winners))
     record_match_outcome("Arrow Man Duel (vs AI)", [name, "RobinBot 🏹"], winners)

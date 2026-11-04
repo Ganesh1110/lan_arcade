@@ -17,6 +17,7 @@ direct_input = False
 ARENA_WIDTH = 66
 ARENA_HEIGHT = 16
 GRAVITY = 9.8
+TOTAL_ROUNDS = 3
 
 # Arrow Types
 ARROW_TYPES = {
@@ -29,7 +30,7 @@ ARROW_TYPES = {
 
 def create_state(player_sessions):
     players = []
-    # Dynamic randomized tower positions and elevations each match
+    # Dynamic randomized tower positions and elevations each round
     p1_x = random.randint(6, 14)
     p2_x = random.randint(ARENA_WIDTH - 15, ARENA_WIDTH - 7)
     t1_top = random.randint(8, 11)
@@ -40,6 +41,7 @@ def create_state(player_sessions):
     apples = {}
     positions = {}
     tower_tops = {}
+    round_wins = {}
 
     for idx, s in enumerate(player_sessions):
         pid = s["id"] if isinstance(s, dict) else s.player_id
@@ -53,11 +55,15 @@ def create_state(player_sessions):
         apples[pid] = True  # Apple sitting on head
         positions[pid] = p1_x if idx == 0 else p2_x
         tower_tops[pid] = t1_top if idx == 0 else t2_top
+        round_wins[pid] = 0
 
     wind = random.randint(-4, 4)
 
     return {
         "players": players,
+        "round": 1,
+        "total_rounds": TOTAL_ROUNDS,
+        "round_wins": round_wins,
         "hp": hp,
         "positions": positions,
         "tower_tops": tower_tops,
@@ -91,12 +97,17 @@ def view_for(state, player_id):
     quivers = {int(k): v for k, v in raw_quiv.items()} if isinstance(raw_quiv, dict) else {}
     raw_apples = state.get("apples", {})
     apples = {int(k): v for k, v in raw_apples.items()} if isinstance(raw_apples, dict) else {}
+    raw_wins = state.get("round_wins", {})
+    round_wins = {int(k): v for k, v in raw_wins.items()} if isinstance(raw_wins, dict) else {}
 
     return {
         "player_id": player_id,
         "name": p_data["name"] if p_data else "Archer",
         "opponent_name": opp["name"] if opp else "Rival",
         "players": state["players"],
+        "round": state.get("round", 1),
+        "total_rounds": state.get("total_rounds", TOTAL_ROUNDS),
+        "round_wins": round_wins,
         "hp": hp,
         "positions": pos,
         "tower_tops": tower_tops,
@@ -106,8 +117,8 @@ def view_for(state, player_id):
         "last_shot": state.get("last_shot"),
         "trajectory": state.get("trajectory", []),
         "turn_id": current_player(state),
-        "winner": state["winner"],
-        "log": state["log"]
+        "winner": state.get("winner"),
+        "log": state.get("log", [])
     }
 
 
@@ -333,12 +344,74 @@ def apply_action(state, player_id, action_data):
     # Shift wind for next turn
     state["wind"] = max(-5, min(5, state.get("wind", 0) + random.randint(-2, 2)))
 
-    # Check victory
-    if state["hp"][opp_id] <= 0:
-        state["winner"] = [p_name]
-        log_entries.append(f"🏆 VICTORY! {p_name} felled {opp_name} and reigns supreme as Master Archer!")
+    # Check round/match victory
+    p1_id = state["players"][0]["id"]
+    p2_id = state["players"][1]["id"]
+    p1_hp = state["hp"].get(p1_id, 0)
+    p2_hp = state["hp"].get(p2_id, 0)
 
-    state["turn_index"] += 1
+    round_finished = (p1_hp <= 0 or p2_hp <= 0)
+    if round_finished:
+        curr_round = state.get("round", 1)
+        tot_rounds = state.get("total_rounds", TOTAL_ROUNDS)
+
+        if p1_hp > 0 and p2_hp <= 0:
+            round_winner_id = p1_id
+            round_winner_name = state["players"][0]["name"]
+        elif p2_hp > 0 and p1_hp <= 0:
+            round_winner_id = p2_id
+            round_winner_name = state["players"][1]["name"]
+        else:
+            round_winner_id = None
+            round_winner_name = None
+
+        if round_winner_id is not None:
+            state["round_wins"][round_winner_id] = state["round_wins"].get(round_winner_id, 0) + 1
+            log_entries.append(f"🏁 ROUND {curr_round} OVER! {round_winner_name} won Round {curr_round}!")
+        else:
+            log_entries.append(f"🏁 ROUND {curr_round} OVER! Round ended in a draw!")
+
+        s1 = state["round_wins"].get(p1_id, 0)
+        s2 = state["round_wins"].get(p2_id, 0)
+        log_entries.append(f"   ➔ Standings: {state['players'][0]['name']} [{s1}] — [{s2}] {state['players'][1]['name']}")
+
+        if curr_round < tot_rounds:
+            state["round"] = curr_round + 1
+            # Re-randomize positions and elevations for the next round
+            state["positions"][p1_id] = random.randint(6, 14)
+            state["positions"][p2_id] = random.randint(ARENA_WIDTH - 15, ARENA_WIDTH - 7)
+            state["tower_tops"][p1_id] = random.randint(8, 11)
+            state["tower_tops"][p2_id] = random.randint(8, 11)
+
+            # Reset HP, Quivers, Apples
+            for pid in state["hp"]:
+                state["hp"][pid] = 100
+            for pid in state["quivers"]:
+                state["quivers"][pid] = {"fire": 1, "pierce": 1, "bomb": 1}
+            for pid in state["apples"]:
+                state["apples"][pid] = True
+
+            state["wind"] = random.randint(-4, 4)
+            state["trajectory"] = []
+
+            # Alternate who starts the next round
+            next_start_idx = (state["round"] - 1) % len(state["players"])
+            state["turn_index"] = next_start_idx
+            log_entries.append(f"🏹 Starting Round {state['round']} of {tot_rounds}! Towers relocated to new positions!")
+        else:
+            # All rounds complete
+            if s1 > s2:
+                state["winner"] = [state["players"][0]["name"]]
+                log_entries.append(f"🏆 MATCH CHAMPION! {state['players'][0]['name']} reigns supreme ({s1} - {s2})!")
+            elif s2 > s1:
+                state["winner"] = [state["players"][1]["name"]]
+                log_entries.append(f"🏆 MATCH CHAMPION! {state['players'][1]['name']} reigns supreme ({s2} - {s1})!")
+            else:
+                state["winner"] = []
+                log_entries.append(f"🤝 DUEL TIED! Both archers drew the match ({s1} - {s2})!")
+    else:
+        state["turn_index"] += 1
+
     state["log"].extend(log_entries)
     if len(state["log"]) > 8:
         state["log"] = state["log"][-8:]
@@ -347,18 +420,12 @@ def apply_action(state, player_id, action_data):
 
 
 def is_over(state):
-    if state.get("winner") is not None:
-        return True
-    return any(hp <= 0 for hp in state.get("hp", {}).values())
+    return state.get("winner") is not None
 
 
 def get_winner(state):
-    if state.get("winner"):
+    if state.get("winner") is not None:
         return state["winner"]
-    if is_over(state):
-        for p in state["players"]:
-            if state.get("hp", {}).get(p["id"], 0) > 0:
-                return [p["name"]]
     return []
 
 
@@ -514,9 +581,17 @@ def render_dashboard(view):
     else:
         wind_txt = "💨 WIND: Calm (0 mph)"
 
+    round_num = view.get("round", 1)
+    tot_rounds = view.get("total_rounds", TOTAL_ROUNDS)
+    rw = view.get("round_wins", {})
+    s1 = rw.get(p1["id"], 0)
+    s2 = rw.get(p2["id"], 0)
+    round_header = f"⚔️ ROUND {round_num} OF {tot_rounds}  •  SCORE: {p1['name']} [{s1}] — [{s2}] {p2['name']}"
+
     out = [
         paint("=" * 70, "1;36"),
         paint("                 🏹 A R R O W   M A N   D U E L 🎯", "1;36"),
+        paint(f"{round_header:^70}", "1;35"),
         paint("=" * 70, "1;36"),
         ""
     ]
@@ -555,8 +630,12 @@ def render_dashboard(view):
 
 def render_final(view, message, winners):
     parts = [render_dashboard(view), ""]
+    p1 = view.get("players", [])[0] if len(view.get("players", [])) > 0 else {"id": 0, "name": "P1"}
+    p2 = view.get("players", [])[1] if len(view.get("players", [])) > 1 else {"id": 1, "name": "P2"}
+    s1 = view.get("round_wins", {}).get(p1["id"], 0)
+    s2 = view.get("round_wins", {}).get(p2["id"], 0)
     if winners:
-        parts.append(paint(f"  🏆  VICTORY! Champion Archer: {', '.join(winners)}!  🏆", "1;32"))
+        parts.append(paint(f"  🏆  VICTORY! Champion Archer: {', '.join(winners)} ({s1} - {s2})!  🏆", "1;32"))
     else:
-        parts.append(paint("  Both archers fell in a draw!", "1;33"))
+        parts.append(paint(f"  Duel concluded in a draw ({s1} - {s2})!", "1;33"))
     return "\n".join(parts)
