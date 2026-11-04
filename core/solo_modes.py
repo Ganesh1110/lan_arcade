@@ -6,6 +6,7 @@ import copy
 import math
 import random
 import time
+from collections import deque
 from config import clear_screen, paint, play_sound
 from games import (
     connect4, tic_tac_toe, battleship, snake_and_ladder, game2048, shiritori,
@@ -835,14 +836,15 @@ def run_artillery_vs_ai():
 def _get_best_snake_duel_move(state, bot_id=1, human_like=False):
     curr_x, curr_y = state["positions"][bot_id]
     dx, dy = state["directions"][bot_id]
-    pellet = state.get("pellet")
+    pellet = tuple(state["pellet"]) if state.get("pellet") else None
 
     all_trails = set(state["trails"].get(0, [])) | set(state["trails"].get(1, []))
     opp_pos = state["positions"].get(0)
     if opp_pos:
         all_trails.add(opp_pos)
 
-    candidates = []
+    # 1. Immediate legal moves (avoid walls, solid bodies, and instant 180° reversals)
+    candidates = {}
     for cmd, (ndx, ndy) in [("W", (0, -1)), ("S", (0, 1)), ("A", (-1, 0)), ("D", (1, 0))]:
         if (ndx, ndy) == (-dx, -dy) and len(state["trails"].get(bot_id, [])) > 1:
             continue
@@ -850,52 +852,75 @@ def _get_best_snake_duel_move(state, bot_id=1, human_like=False):
         ny = curr_y + ndy
         if 0 <= nx < snake_duel.ARENA_WIDTH and 0 <= ny < snake_duel.ARENA_HEIGHT:
             if (nx, ny) not in all_trails:
-                candidates.append((cmd, (nx, ny), (ndx, ndy)))
+                candidates[cmd] = (nx, ny, ndx, ndy)
 
     if not candidates:
         return "STRAIGHT"
 
-    if not human_like:
-        if pellet:
-            candidates.sort(key=lambda item: abs(item[1][0] - pellet[0]) + abs(item[1][1] - pellet[1]))
-        return candidates[0][0]
-
-    # Human-like lightcycle steering:
-    # 1. Breadth-first search to evaluate open space ahead (avoiding dead ends)
-    scored = []
-    for cmd, (nx, ny), (ndx, ndy) in candidates:
+    # Helper: Count accessible open space ahead using BFS flood-fill
+    def count_open_space(start_pt):
         visited = set(all_trails)
-        visited.add((nx, ny))
-        queue = [(nx, ny)]
-        space_count = 0
-        while queue and space_count < 14:
-            cx, cy = queue.pop(0)
-            space_count += 1
+        visited.add(start_pt)
+        q = deque([start_pt])
+        cnt = 0
+        while q and cnt < 25:
+            cx, cy = q.popleft()
+            cnt += 1
             for qdx, qdy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
                 qx, qy = cx + qdx, cy + qdy
                 if 0 <= qx < snake_duel.ARENA_WIDTH and 0 <= qy < snake_duel.ARENA_HEIGHT:
                     if (qx, qy) not in visited:
                         visited.add((qx, qy))
-                        queue.append((qx, qy))
+                        q.append((qx, qy))
+        return cnt
 
-        score = space_count * 3.0
+    # 2. Direct BFS Shortest Path to Apple (Pellet)
+    if pellet:
+        queue = deque([((curr_x, curr_y), [])])
+        visited = set(all_trails)
+        visited.add((curr_x, curr_y))
+        target_path = None
+        while queue:
+            (cx, cy), path = queue.popleft()
+            if (cx, cy) == pellet:
+                target_path = path
+                break
+            for cmd, (ndx, ndy) in [("W", (0, -1)), ("S", (0, 1)), ("A", (-1, 0)), ("D", (1, 0))]:
+                if not path and (ndx, ndy) == (-dx, -dy) and len(state["trails"].get(bot_id, [])) > 1:
+                    continue
+                nx, ny = cx + ndx, cy + ndy
+                if 0 <= nx < snake_duel.ARENA_WIDTH and 0 <= ny < snake_duel.ARENA_HEIGHT:
+                    if (nx, ny) not in visited:
+                        visited.add((nx, ny))
+                        queue.append(((nx, ny), path + [cmd]))
 
-        # Momentum: humans prefer continuing straight unless a turn is required
-        is_straight = ((ndx, ndy) == (dx, dy))
-        if is_straight:
-            score += 8.0
+        if target_path:
+            first_cmd = target_path[0]
+            if first_cmd in candidates:
+                nxt_x, nxt_y, _, _ = candidates[first_cmd]
+                # Follow the path to the apple if it leaves sufficient room to escape (no suicide coils)
+                my_len = len(state["trails"].get(bot_id, []))
+                if count_open_space((nxt_x, nxt_y)) >= min(6, my_len + 1):
+                    return first_cmd
 
-        # Fruit attraction if safe
-        if pellet and space_count >= 5:
-            p_dist = abs(nx - pellet[0]) + abs(ny - pellet[1])
-            score += max(0, 16 - p_dist * 2)
+    # 3. Fallback: Score candidate moves combining open space, fruit attraction, and forward momentum
+    scored = []
+    for cmd, (nx, ny, ndx, ndy) in candidates.items():
+        space = count_open_space((nx, ny))
+        score = space * 3.5
 
-        # Early game spacing (first 3 turns): avoid charging straight into the opponent's midline
-        trail_len = len(state["trails"].get(bot_id, []))
-        if trail_len <= 3 and is_straight and opp_pos and abs(ny - opp_pos[1]) <= 1:
-            score -= 5.0
+        if pellet:
+            dist = abs(nx - pellet[0]) + abs(ny - pellet[1])
+            # Consistent global attraction to apple across the entire arena
+            score += max(0, 50 - dist * 2.5)
 
-        score += random.uniform(-0.5, 0.5)
+        # Slight forward momentum preference when open
+        if (ndx, ndy) == (dx, dy):
+            score += 2.0
+
+        if human_like:
+            score += random.uniform(-0.5, 0.5)
+
         scored.append((score, cmd))
 
     scored.sort(key=lambda x: x[0], reverse=True)
