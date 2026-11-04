@@ -29,14 +29,17 @@ ARROW_TYPES = {
 
 def create_state(player_sessions):
     players = []
-    # Fixed towers for clean stickman presentation
-    p1_x = 8
-    p2_x = ARENA_WIDTH - 9
+    # Dynamic randomized tower positions and elevations each match
+    p1_x = random.randint(6, 14)
+    p2_x = random.randint(ARENA_WIDTH - 15, ARENA_WIDTH - 7)
+    t1_top = random.randint(8, 11)
+    t2_top = random.randint(8, 11)
 
     hp = {}
     quivers = {}
     apples = {}
     positions = {}
+    tower_tops = {}
 
     for idx, s in enumerate(player_sessions):
         pid = s["id"] if isinstance(s, dict) else s.player_id
@@ -49,6 +52,7 @@ def create_state(player_sessions):
         quivers[pid] = {"fire": 1, "pierce": 1, "bomb": 1}
         apples[pid] = True  # Apple sitting on head
         positions[pid] = p1_x if idx == 0 else p2_x
+        tower_tops[pid] = t1_top if idx == 0 else t2_top
 
     wind = random.randint(-4, 4)
 
@@ -56,6 +60,7 @@ def create_state(player_sessions):
         "players": players,
         "hp": hp,
         "positions": positions,
+        "tower_tops": tower_tops,
         "quivers": quivers,
         "apples": apples,
         "wind": wind,
@@ -80,6 +85,8 @@ def view_for(state, player_id):
     hp = {int(k): v for k, v in raw_hp.items()} if isinstance(raw_hp, dict) else {}
     raw_pos = state.get("positions", {})
     pos = {int(k): v for k, v in raw_pos.items()} if isinstance(raw_pos, dict) else {}
+    raw_tops = state.get("tower_tops", {})
+    tower_tops = {int(k): v for k, v in raw_tops.items()} if isinstance(raw_tops, dict) else {}
     raw_quiv = state.get("quivers", {})
     quivers = {int(k): v for k, v in raw_quiv.items()} if isinstance(raw_quiv, dict) else {}
     raw_apples = state.get("apples", {})
@@ -92,6 +99,7 @@ def view_for(state, player_id):
         "players": state["players"],
         "hp": hp,
         "positions": pos,
+        "tower_tops": tower_tops,
         "quivers": quivers,
         "apples": apples,
         "wind": state.get("wind", 0),
@@ -151,7 +159,7 @@ def parse_action(state_or_view, player_id, raw_input):
     return True, {"angle": angle, "power": power, "arrow": arrow_type}
 
 
-def simulate_arrow_flight(p1_x, p2_x, shooter_idx, angle_deg, power, wind, arrow_type, opp_apple):
+def simulate_arrow_flight(p1_x, p2_x, shooter_idx, angle_deg, power, wind, arrow_type, opp_apple, t1_top=10, t2_top=10):
     """
     Simulate parabolic flight trajectory of the arrow.
     shooter_idx: 0 (Left shooting Right) or 1 (Right shooting Left)
@@ -162,24 +170,21 @@ def simulate_arrow_flight(p1_x, p2_x, shooter_idx, angle_deg, power, wind, arrow
     arrow_info = ARROW_TYPES.get(arrow_type, ARROW_TYPES["standard"])
     wind_factor = arrow_info["wind_factor"]
 
-    # Direction: Left shooter flies rightward (+x), Right shooter flies leftward (-x)
+    # Direction and starting height
     if shooter_idx == 0:
         dir_mult = 1.0
         start_x = float(p1_x + 2)
+        start_y = float(ARENA_HEIGHT - 1 - (t1_top - 2))  # bow height
         target_x = float(p2_x)
+        opp_top = float(t2_top)
     else:
         dir_mult = -1.0
         start_x = float(p2_x - 2)
+        start_y = float(ARENA_HEIGHT - 1 - (t2_top - 2))  # bow height
         target_x = float(p1_x)
+        opp_top = float(t1_top)
 
-    # Archer vertical hitboxes on tower:
-    # Tower top is at row 10. Archer stands rows 6..9
-    # Row 6: Apple (if present)
-    # Row 7: Head
-    # Row 8: Torso / Arms
-    # Row 9: Legs
-    # Row 10..15: Tower base
-    start_y = 7.0  # bow height
+    opp_base_y = float(ARENA_HEIGHT - 1 - opp_top)
 
     v0 = power * 0.44
     vx = v0 * math.cos(rad) * dir_mult
@@ -210,24 +215,24 @@ def simulate_arrow_flight(p1_x, p2_x, shooter_idx, angle_deg, power, wind, arrow
                 trajectory.append((grid_col, grid_row))
 
         # Check collision with opponent archer column
-        if target_left <= x <= target_right and 0 <= y <= 12:
-            # Check vertical zones (y in height coords):
-            # Apple: y ~ 9.5 to 10.5 (Row 5-6)
-            # Head: y ~ 8.0 to 9.4 (Row 7)
-            # Body: y ~ 6.5 to 7.9 (Row 8)
-            # Legs: y ~ 5.0 to 6.4 (Row 9)
-            # Tower: y < 5.0 (Row 10+)
-            if opp_apple and y >= 9.5:
+        if target_left <= x <= target_right and 0 <= y <= opp_base_y + 6.0:
+            # Hitboxes relative to opponent's tower platform (opp_base_y):
+            # Apple: y >= opp_base_y + 3.8
+            # Head: y >= opp_base_y + 2.5
+            # Body: y >= opp_base_y + 1.2
+            # Legs: y >= opp_base_y
+            # Tower: y < opp_base_y
+            if opp_apple and y >= opp_base_y + 3.8:
                 apple_hit = True
                 hit_type = "apple"
                 damage = 30 + arrow_info["bonus"]
-            elif y >= 8.0:
+            elif y >= opp_base_y + 2.5:
                 hit_type = "head"
                 damage = 55 + arrow_info["bonus"]
-            elif y >= 6.5:
+            elif y >= opp_base_y + 1.2:
                 hit_type = "body"
                 damage = 35 + arrow_info["bonus"]
-            elif y >= 5.0:
+            elif y >= opp_base_y:
                 hit_type = "legs"
                 damage = 20 + arrow_info["bonus"]
             else:
@@ -264,6 +269,8 @@ def apply_action(state, player_id, action_data):
     shooter_idx = 0 if state["players"][0]["id"] == player_id else 1
     p1_x = state["positions"][state["players"][0]["id"]]
     p2_x = state["positions"][state["players"][1]["id"]]
+    t1_top = state.get("tower_tops", {}).get(state["players"][0]["id"], 10)
+    t2_top = state.get("tower_tops", {}).get(state["players"][1]["id"], 10)
 
     angle = action_data["angle"]
     power = action_data["power"]
@@ -278,7 +285,7 @@ def apply_action(state, player_id, action_data):
 
     # Simulate arrow flight
     traj, hit_type, dmg, impact, apple_struck = simulate_arrow_flight(
-        p1_x, p2_x, shooter_idx, angle, power, wind, arrow_type, opp_apple
+        p1_x, p2_x, shooter_idx, angle, power, wind, arrow_type, opp_apple, t1_top, t2_top
     )
 
     state["trajectory"] = traj
@@ -366,6 +373,8 @@ def _render_arena(state_or_view):
     p2 = state_or_view["players"][1]
     p1_pos = state_or_view["positions"].get(p1["id"], 8)
     p2_pos = state_or_view["positions"].get(p2["id"], ARENA_WIDTH - 9)
+    t1_top = state_or_view.get("tower_tops", {}).get(p1["id"], 10)
+    t2_top = state_or_view.get("tower_tops", {}).get(p2["id"], 10)
     p1_hp = state_or_view["hp"].get(p1["id"], 100)
     p2_hp = state_or_view["hp"].get(p2["id"], 100)
     p1_apple = state_or_view.get("apples", {}).get(p1["id"], True)
@@ -373,12 +382,11 @@ def _render_arena(state_or_view):
     traj_set = set(state_or_view.get("trajectory", []))
     last_shot = state_or_view.get("last_shot")
 
-    # Tower heights & geometry
-    tower_top_row = 10
+    min_top = min(t1_top, t2_top)
     grid = [[" " for _ in range(ARENA_WIDTH)] for _ in range(ARENA_HEIGHT)]
 
     # Draw sky dots faintly
-    for r in range(tower_top_row):
+    for r in range(min_top):
         for c in range(ARENA_WIDTH):
             if (r + c) % 11 == 0:
                 grid[r][c] = "·"
@@ -388,16 +396,17 @@ def _render_arena(state_or_view):
         if 0 <= tc < ARENA_WIDTH and 0 <= tr < ARENA_HEIGHT:
             grid[tr][tc] = "•"
 
-    # Draw Towers
-    for r in range(tower_top_row, ARENA_HEIGHT):
-        # Left tower
+    # Draw Left Tower
+    for r in range(t1_top, ARENA_HEIGHT):
         for c in range(p1_pos - 3, p1_pos + 4):
             if 0 <= c < ARENA_WIDTH:
-                grid[r][c] = "═" if r == tower_top_row else "▒"
-        # Right tower
+                grid[r][c] = "═" if r == t1_top else "▒"
+
+    # Draw Right Tower
+    for r in range(t2_top, ARENA_HEIGHT):
         for c in range(p2_pos - 3, p2_pos + 4):
             if 0 <= c < ARENA_WIDTH:
-                grid[r][c] = "═" if r == tower_top_row else "▒"
+                grid[r][c] = "═" if r == t2_top else "▒"
 
     # Draw Valley ground / water
     for c in range(p1_pos + 4, p2_pos - 3):
@@ -405,33 +414,33 @@ def _render_arena(state_or_view):
             grid[ARENA_HEIGHT - 1][c] = "~"
             grid[ARENA_HEIGHT - 2][c] = "~"
 
-    # Draw Archer 1 (Left, shooting East/Right)
+    # Draw Archer 1 (Left, shooting East/Right from t1_top)
     if p1_hp > 0:
         if p1_apple:
-            grid[5][p1_pos] = "🍎"
-        grid[6][p1_pos] = "o"
-        grid[7][p1_pos - 1] = "/"
-        grid[7][p1_pos] = "|"
-        grid[7][p1_pos + 1] = "\\"
-        grid[7][p1_pos + 2] = "»"
-        grid[8][p1_pos - 1] = "/"
-        grid[8][p1_pos + 1] = "\\"
+            grid[t1_top - 4][p1_pos] = "🍎"
+        grid[t1_top - 3][p1_pos] = "o"
+        grid[t1_top - 2][p1_pos - 1] = "/"
+        grid[t1_top - 2][p1_pos] = "|"
+        grid[t1_top - 2][p1_pos + 1] = "\\"
+        grid[t1_top - 2][p1_pos + 2] = "»"
+        grid[t1_top - 1][p1_pos - 1] = "/"
+        grid[t1_top - 1][p1_pos + 1] = "\\"
     else:
-        grid[9][p1_pos] = "💀"
+        grid[t1_top - 1][p1_pos] = "💀"
 
-    # Draw Archer 2 (Right, shooting West/Left)
+    # Draw Archer 2 (Right, shooting West/Left from t2_top)
     if p2_hp > 0:
         if p2_apple:
-            grid[5][p2_pos] = "🍎"
-        grid[6][p2_pos] = "o"
-        grid[7][p2_pos - 2] = "«"
-        grid[7][p2_pos - 1] = "/"
-        grid[7][p2_pos] = "|"
-        grid[7][p2_pos + 1] = "\\"
-        grid[8][p2_pos - 1] = "/"
-        grid[8][p2_pos + 1] = "\\"
+            grid[t2_top - 4][p2_pos] = "🍎"
+        grid[t2_top - 3][p2_pos] = "o"
+        grid[t2_top - 2][p2_pos - 2] = "«"
+        grid[t2_top - 2][p2_pos - 1] = "/"
+        grid[t2_top - 2][p2_pos] = "|"
+        grid[t2_top - 2][p2_pos + 1] = "\\"
+        grid[t2_top - 1][p2_pos - 1] = "/"
+        grid[t2_top - 1][p2_pos + 1] = "\\"
     else:
-        grid[9][p2_pos] = "💀"
+        grid[t2_top - 1][p2_pos] = "💀"
 
     # Compile painted rows
     rendered_rows = []
@@ -476,6 +485,11 @@ def render_dashboard(view):
     p1 = players[0] if len(players) > 0 else {"id": 0, "name": "P1"}
     p2 = players[1] if len(players) > 1 else {"id": 1, "name": "P2"}
 
+    p1_pos = view.get("positions", {}).get(p1["id"], 8)
+    p2_pos = view.get("positions", {}).get(p2["id"], ARENA_WIDTH - 9)
+    t1_top = view.get("tower_tops", {}).get(p1["id"], 10)
+    t2_top = view.get("tower_tops", {}).get(p2["id"], 10)
+
     hp1 = view.get("hp", {}).get(p1["id"], 100)
     hp2 = view.get("hp", {}).get(p2["id"], 100)
     quiv1 = view.get("quivers", {}).get(p1["id"], {})
@@ -484,6 +498,13 @@ def render_dashboard(view):
     wind = view.get("wind", 0)
     log = view.get("log", [])
     last_shot = view.get("last_shot")
+
+    # Range and Elevation difference
+    dist = abs(p2_pos - p1_pos)
+    p1_elev = ARENA_HEIGHT - 1 - t1_top
+    p2_elev = ARENA_HEIGHT - 1 - t2_top
+    elev_diff = p2_elev - p1_elev
+    elev_txt = f"{elev_diff:+d}m (Uphill)" if elev_diff > 0 else (f"{elev_diff:+d}m (Downhill)" if elev_diff < 0 else "0m (Level)")
 
     # Wind indicator
     if wind > 0:
@@ -509,7 +530,7 @@ def render_dashboard(view):
 
     out.append(f"{p1_active} [P1] {p1['name']:<12}: [{bar1}] {hp1:3d} HP | Quiver: 🔥x{quiv1.get('fire', 0)} 🗡️x{quiv1.get('pierce', 0)} 💥x{quiv1.get('bomb', 0)}")
     out.append(f"{p2_active} [P2] {p2['name']:<12}: [{bar2}] {hp2:3d} HP | Quiver: 🔥x{quiv2.get('fire', 0)} 🗡️x{quiv2.get('pierce', 0)} 💥x{quiv2.get('bomb', 0)}")
-    out.append(f"      {paint(wind_txt, '1;33'):^58}")
+    out.append(f"   {paint(wind_txt, '1;33')}  |  {paint(f'Range: {dist}m', '1;37')}  |  {paint(f'Slope: {elev_txt}', '1;36')}")
     out.append("")
 
     # Visual Battlefield

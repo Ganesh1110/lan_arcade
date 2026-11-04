@@ -67,6 +67,38 @@ class TestArrowMan(unittest.TestCase):
         self.assertTrue(arrow_man.is_over(self.state))
         self.assertEqual(arrow_man.get_winner(self.state), ["Archer1"])
 
+    def test_randomized_positions_and_elevations(self):
+        p1_positions = set()
+        p2_positions = set()
+        t1_elevations = set()
+        t2_elevations = set()
+
+        for _ in range(30):
+            st = arrow_man.create_state(self.sessions)
+            p1_x = st["positions"][0]
+            p2_x = st["positions"][1]
+            t1_top = st["tower_tops"][0]
+            t2_top = st["tower_tops"][1]
+
+            self.assertTrue(6 <= p1_x <= 14, f"p1_x {p1_x} out of bounds [6, 14]")
+            self.assertTrue(
+                arrow_man.ARENA_WIDTH - 15 <= p2_x <= arrow_man.ARENA_WIDTH - 7,
+                f"p2_x {p2_x} out of bounds"
+            )
+            self.assertTrue(8 <= t1_top <= 11, f"t1_top {t1_top} out of bounds [8, 11]")
+            self.assertTrue(8 <= t2_top <= 11, f"t2_top {t2_top} out of bounds [8, 11]")
+
+            p1_positions.add(p1_x)
+            p2_positions.add(p2_x)
+            t1_elevations.add(t1_top)
+            t2_elevations.add(t2_top)
+
+        # Confirm variation across multiple matches
+        self.assertGreater(len(p1_positions), 1)
+        self.assertGreater(len(p2_positions), 1)
+        self.assertGreater(len(t1_elevations), 1)
+        self.assertGreater(len(t2_elevations), 1)
+
     def test_render_dashboard(self):
         v = arrow_man.view_for(self.state, 0)
         dashboard = arrow_man.render_dashboard(v)
@@ -74,6 +106,8 @@ class TestArrowMan(unittest.TestCase):
         self.assertIn("Archer1", dashboard)
         self.assertIn("Archer2", dashboard)
         self.assertIn("100 HP", dashboard)
+        self.assertIn("Range:", dashboard)
+        self.assertIn("Slope:", dashboard)
 
 
 if __name__ == "__main__":

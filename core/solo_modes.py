@@ -1199,6 +1199,8 @@ def run_chess_vs_ai():
 def _get_best_arrow_man_shot(state, bot_id=1, shot_num=1, human_like=True):
     p1_x = state["positions"][state["players"][0]["id"]]
     p2_x = state["positions"][state["players"][1]["id"]]
+    t1_top = state.get("tower_tops", {}).get(state["players"][0]["id"], 10)
+    t2_top = state.get("tower_tops", {}).get(state["players"][1]["id"], 10)
     wind = state.get("wind", 0)
     opp_apple = state.get("apples", {}).get(state["players"][0]["id"], True)
     quiv = state.get("quivers", {}).get(bot_id, {})
@@ -1214,13 +1216,15 @@ def _get_best_arrow_man_shot(state, bot_id=1, shot_num=1, human_like=True):
     best_candidate = None
     min_dist = 999.0
 
+    target_y = float(arrow_man.ARENA_HEIGHT - 1 - t1_top + 2)
+
     for test_ang in range(35, 65, 3):
         for test_pow in range(40, 95, 2):
             _, hit_type, dmg, impact, apple_hit = arrow_man.simulate_arrow_flight(
-                p1_x, p2_x, 1, test_ang, test_pow, wind, arrow_choice, opp_apple
+                p1_x, p2_x, 1, test_ang, test_pow, wind, arrow_choice, opp_apple, t1_top, t2_top
             )
             ix, iy = impact
-            dist = abs(ix - p1_x) + abs(iy - 7)
+            dist = abs(ix - p1_x) + abs(iy - target_y)
             if hit_type in {"apple", "head", "body"}:
                 best_candidate = (test_ang, test_pow)
                 break
