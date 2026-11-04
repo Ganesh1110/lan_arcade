@@ -21,6 +21,7 @@ from games import typing_racer
 from games import artillery
 from games import snake_duel
 from games import sonar
+from games import arrow_man
 
 GAMES_REGISTRY = {
     bingo.game_id: bingo,
@@ -42,7 +43,8 @@ GAMES_REGISTRY = {
     typing_racer.game_id: typing_racer,
     artillery.game_id: artillery,
     snake_duel.game_id: snake_duel,
-    sonar.game_id: sonar
+    sonar.game_id: sonar,
+    arrow_man.game_id: arrow_man
 }
 
 

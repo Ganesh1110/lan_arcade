@@ -25,7 +25,8 @@ from core.solo_modes import (
     run_solo_typing_racer,
     run_artillery_vs_ai,
     run_snake_duel_vs_ai,
-    run_chess_vs_ai
+    run_chess_vs_ai,
+    run_arrow_man_vs_ai
 )
 from utils.stats import render_hall_of_fame
 from games import (
@@ -34,7 +35,7 @@ from games import (
     shiritori, game2048,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
     chess_game, wordle, quiz_show, typing_racer,
-    artillery, snake_duel, sonar
+    artillery, snake_duel, sonar, arrow_man
 )
 
 
@@ -62,6 +63,7 @@ def host_menu():
             f"Artillery Duel / Pocket Tanks ({artillery.min_players} players)",
             f"Snake Duel / Tron Lightcycles ({snake_duel.min_players} players)",
             f"Sonar Submarine Radar Hunt ({sonar.min_players} players)",
+            f"Arrow Man Duel / Bowman Archery ({arrow_man.min_players} players)",
             "Back to Main Menu"
         ]
         print(render_menu("HOST A LAN GAME", options))
@@ -127,10 +129,13 @@ def host_menu():
         elif choice == "20":
             host_lan_game_session(sonar)
             break
-        elif choice == "21" or choice.lower() in {"q", "back", "exit"}:
+        elif choice == "21":
+            host_lan_game_session(arrow_man)
+            break
+        elif choice == "22" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–21.")
+            print("Please enter 1–22.")
             input("Press Enter to continue...")
 
 
@@ -151,6 +156,7 @@ def solo_menu():
             "Artillery Duel (vs Ballistics AI 🎯)",
             "Snake Duel (vs TronBot ⚡)",
             "Chess (vs ChessBot ♟️)",
+            "Arrow Man Duel (vs RobinBot 🏹)",
             "Back to Main Menu"
         ]
         print(render_menu("SOLO & OFFLINE ARCADE", options))
@@ -182,10 +188,12 @@ def solo_menu():
             run_snake_duel_vs_ai()
         elif choice == "13":
             run_chess_vs_ai()
-        elif choice == "14" or choice.lower() in {"q", "back", "exit"}:
+        elif choice == "14":
+            run_arrow_man_vs_ai()
+        elif choice == "15" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–14.")
+            print("Please enter 1–15.")
             input("Press Enter to continue...")
 
 

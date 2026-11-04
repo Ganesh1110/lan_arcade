@@ -9,7 +9,7 @@ import time
 from config import clear_screen, paint, play_sound
 from games import (
     connect4, tic_tac_toe, battleship, snake_and_ladder, game2048, shiritori,
-    wordle, quiz_show, typing_racer, artillery, snake_duel, chess_game
+    wordle, quiz_show, typing_racer, artillery, snake_duel, chess_game, arrow_man
 )
 from utils.input import read_direct_key
 from utils.dictionary import get_words_set
@@ -1165,6 +1165,126 @@ def run_chess_vs_ai():
     print(chess_game.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Chess (vs Bot)", [name, "ChessBot ♟️"], winners)
+    input("\nPress Enter to return to solo menu...")
+
+
+# ==========================================
+# 14. ARROW MAN DUEL VS ROBIN BOT
+# ==========================================
+def _get_best_arrow_man_shot(state, bot_id=1, shot_num=1, human_like=True):
+    p1_x = state["positions"][state["players"][0]["id"]]
+    p2_x = state["positions"][state["players"][1]["id"]]
+    wind = state.get("wind", 0)
+    opp_apple = state.get("apples", {}).get(state["players"][0]["id"], True)
+    quiv = state.get("quivers", {}).get(bot_id, {})
+
+    arrow_choice = "standard"
+    if quiv.get("bomb", 0) > 0 and shot_num >= 3:
+        arrow_choice = "bomb"
+    elif quiv.get("fire", 0) > 0 and shot_num >= 2 and random.random() < 0.6:
+        arrow_choice = "fire"
+    elif quiv.get("pierce", 0) > 0 and abs(wind) >= 3:
+        arrow_choice = "pierce"
+
+    best_candidate = None
+    min_dist = 999.0
+
+    for test_ang in range(35, 65, 3):
+        for test_pow in range(40, 95, 2):
+            _, hit_type, dmg, impact, apple_hit = arrow_man.simulate_arrow_flight(
+                p1_x, p2_x, 1, test_ang, test_pow, wind, arrow_choice, opp_apple
+            )
+            ix, iy = impact
+            dist = abs(ix - p1_x) + abs(iy - 7)
+            if hit_type in {"apple", "head", "body"}:
+                best_candidate = (test_ang, test_pow)
+                break
+            if dist < min_dist:
+                min_dist = dist
+                best_candidate = (test_ang, test_pow)
+        if best_candidate and hit_type in {"apple", "head"}:
+            break
+
+    if not best_candidate:
+        best_candidate = (45, 68)
+
+    if not human_like:
+        return {"angle": best_candidate[0], "power": best_candidate[1], "arrow": arrow_choice}
+
+    if shot_num == 1:
+        p_offset = random.choice([-12.0, -10.0, 10.0])
+        a_offset = random.uniform(-4.0, 4.0)
+    elif shot_num == 2:
+        p_offset = random.choice([-6.0, 5.0, -4.0])
+        a_offset = random.uniform(-2.5, 2.5)
+    elif shot_num == 3:
+        p_offset = random.choice([-3.0, 3.0, 0.0])
+        a_offset = random.uniform(-1.5, 1.5)
+    else:
+        p_offset = random.uniform(-1.5, 1.5)
+        a_offset = random.uniform(-1.0, 1.0)
+
+    final_ang = max(20.0, min(80.0, round(best_candidate[0] + a_offset, 1)))
+    final_pow = max(20.0, min(95.0, round(best_candidate[1] + p_offset, 1)))
+    return {"angle": final_ang, "power": final_pow, "arrow": arrow_choice}
+
+
+def run_arrow_man_vs_ai():
+    clear_screen()
+    print(paint("=" * 50, "1;36"))
+    print(paint("       ARROW MAN DUEL VS ROBIN BOT 🏹", "1;36"))
+    print(paint("=" * 50, "1;36"))
+    name = clean_name(input("\nEnter your player name [Archer]: "), "Archer")
+
+    state = arrow_man.create_state([{"id": 0, "name": name}, {"id": 1, "name": "RobinBot 🏹"}])
+    bot_shot_count = 0
+
+    while not arrow_man.is_over(state):
+        curr_id = arrow_man.current_player(state)
+        clear_screen()
+        v = arrow_man.view_for(state, 0)
+        print(arrow_man.render_dashboard(v))
+
+        if curr_id == 0:
+            play_sound("turn")
+            while True:
+                raw = input("\n  ▶ Enter Angle & Power (e.g. '45 70' or '50 75 fire', 'q' to quit): ").strip()
+                if raw.lower() in {"q", "quit", "exit"}:
+                    return
+                valid, action_data = arrow_man.parse_action(state, 0, raw)
+                if valid:
+                    arrow_man.apply_action(state, 0, action_data)
+                    break
+                print(paint(f"  ! {action_data}", "1;31"))
+        else:
+            bot_shot_count += 1
+            if bot_shot_count == 1:
+                print("\n  🏹 RobinBot is notching an arrow and checking the crosswind...")
+            elif bot_shot_count == 2:
+                print("\n  🏹 RobinBot noticed the trajectory and is adjusting bow elevation...")
+            elif bot_shot_count == 3:
+                print("\n  🏹 RobinBot has calculated the distance and draws to full extension...")
+            else:
+                print("\n  🏹 RobinBot takes careful aim at your head and releases!")
+            time.sleep(1.0)
+            bot_shot = _get_best_arrow_man_shot(state, bot_id=1, shot_num=bot_shot_count, human_like=True)
+            arrow_man.apply_action(state, 1, bot_shot)
+
+    clear_screen()
+    v = arrow_man.view_for(state, 0)
+    winners = arrow_man.get_winner(state)
+    my_hp = state["hp"].get(0, 0)
+    if winners and winners[0] == name:
+        msg = f"🏆 VICTORY! {name} defeated RobinBot with {my_hp} HP remaining!"
+        play_sound("win")
+        record_high_score("arrow_man", name, my_hp, f"{my_hp} HP left")
+    elif winners and "RobinBot" in winners[0]:
+        msg = "💀 DEFEAT! RobinBot felled you in battle!"
+    else:
+        msg = "Archery duel ended in a draw!"
+
+    print(arrow_man.render_final(v, msg, winners))
+    record_match_outcome("Arrow Man Duel (vs AI)", [name, "RobinBot 🏹"], winners)
     input("\nPress Enter to return to solo menu...")
 
 
