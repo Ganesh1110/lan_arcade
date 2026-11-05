@@ -192,12 +192,13 @@ class ClientSession:
     def receive_loop(self):
         try:
             reader = self.sock.makefile("r", encoding="utf-8")
-            for line in reader:
+            while not self.over.is_set():
+                line = reader.readline(65536 + 1)
+                if not line or len(line) > 65536:
+                    break
                 message = decode_message(line)
                 if message:
                     self.handle(message)
-                if self.over.is_set():
-                    return
         except OSError:
             pass
         finally:

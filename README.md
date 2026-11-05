@@ -110,6 +110,15 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
 
 ---
 
+## 🔒 Network Architecture & Security Note
+
+- **Open LAN Design**: College LAN Arcade binds its TCP socket server to `0.0.0.0` (all local network interfaces) on port `50555` with UDP broadcast beacon discovery to enable zero-configuration, friction-free peer joining without credentials.
+- **Trusted Networks**: By design for campus dorms and hackathons, there is no transport encryption or authentication layer. Anyone connected to the same local subnet / Wi-Fi can discover and join open lobbies.
+- **Buffer Safety**: Sockets enforce a strict 64 KB line length limit (`reader.readline(65536)`) to safeguard against buffer exhaustion, and in-game lobby commands (`!game`) are strictly restricted to the host before a match begins.
+- If hosting on a multi-homed or exposed machine, ensure firewall rules or Docker network isolation limit access to trusted peers.
+
+---
+
 ## 🧪 Running Unit Tests
 
 Run all unit tests using Python's built-in `unittest`:

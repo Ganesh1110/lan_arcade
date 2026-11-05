@@ -354,6 +354,7 @@ def _check_insufficient_material(board):
     white_minors = []
     black_minors = []
     bishops = []
+    knights = []
 
     for r in range(8):
         for c in range(8):
@@ -367,27 +368,27 @@ def _check_insufficient_material(board):
                     white_minors.append(p)
                     if p == "B":
                         bishops.append(("White", r, c))
+                    elif p == "N":
+                        knights.append(("White", r, c))
             else:
                 if p != "k":
                     black_minors.append(p)
                     if p == "b":
                         bishops.append(("Black", r, c))
+                    elif p == "n":
+                        knights.append(("Black", r, c))
 
-    # K vs K
-    if len(white_minors) == 0 and len(black_minors) == 0:
+    # If there are no knights on the board and all bishops are on the same square color
+    # (covers K vs K with 0 bishops, K+B vs K with 1 bishop, K+B vs K+B on same color,
+    # or several bishops all on the same color complex)
+    if len(knights) == 0:
+        square_colors = {(r + c) % 2 for _, r, c in bishops}
+        if len(square_colors) <= 1:
+            return True
+
+    # K+N vs K (1 knight, 0 bishops)
+    if len(bishops) == 0 and len(knights) == 1:
         return True
-
-    # K+B vs K or K+N vs K
-    if (len(white_minors) == 1 and len(black_minors) == 0) or (len(white_minors) == 0 and len(black_minors) == 1):
-        return True
-
-    # K+B vs K+B (both bishops on same color square)
-    if len(white_minors) == 1 and len(black_minors) == 1:
-        if white_minors[0] == "B" and black_minors[0] == "b" and len(bishops) == 2:
-            b1_color = (bishops[0][1] + bishops[0][2]) % 2
-            b2_color = (bishops[1][1] + bishops[1][2]) % 2
-            if b1_color == b2_color:
-                return True
 
     return False
 

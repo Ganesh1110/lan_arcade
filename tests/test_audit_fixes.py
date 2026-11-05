@@ -286,6 +286,79 @@ class TestAuditFixes(unittest.TestCase):
         self.assertFalse(room.get_player(1).has_surrendered)
         self.assertFalse(room.get_player(2).has_surrendered)
 
+    def test_game_command_protection_against_guest_and_midgame_swap(self):
+        room = Room("HostUser", bingo)
+        p1 = PlayerSession(1, "GuestUser", is_host=False)
+        room.players.append(p1)
+
+        # 1. Guest attempts !game chess -> rejected
+        guest = p1
+        chat_text = "!game chess"
+        if not room.started and guest.is_host:
+            from games import GAMES_REGISTRY
+            room.game_module = GAMES_REGISTRY["chess"]
+        self.assertEqual(room.game_module, bingo, "Guest should never be allowed to change game_module")
+
+        # 2. Host attempts !game chess while game is already started -> rejected
+        room.started = True
+        host = room.get_player(0)
+        if not room.started and host.is_host:
+            from games import GAMES_REGISTRY
+            room.game_module = GAMES_REGISTRY["chess"]
+        self.assertEqual(room.game_module, bingo, "Mid-game !game swap must be ignored once game has started")
+
+        # 3. Host attempts !game chess before game starts -> allowed
+        room.started = False
+        if not room.started and host.is_host:
+            from games import GAMES_REGISTRY
+            room.game_module = GAMES_REGISTRY["chess"]
+        self.assertEqual(room.game_module, chess_game)
+
+    def test_chess_multiple_same_color_bishops_draw(self):
+        # Multiple bishops all on the same square color cannot deliver checkmate
+        st = chess_game.create_state([{"id": 0, "name": "White"}, {"id": 1, "name": "Black"}])
+        st["board"] = [[None] * 8 for _ in range(8)]
+        st["board"][7][4] = "K"
+        st["board"][0][4] = "k"
+        # Place multiple bishops on light squares:
+        # (7, 2): 7+2=9 (odd)
+        # (5, 4): 5+4=9 (odd)
+        # (3, 2): 3+2=5 (odd)
+        st["board"][7][2] = "B"
+        st["board"][5][4] = "b"
+        st["board"][3][2] = "B"
+
+        v, act = chess_game.parse_action(st, 0, "e1e2")
+        self.assertTrue(v)
+        chess_game.apply_action(st, 0, act)
+        self.assertTrue(chess_game.is_over(st))
+        self.assertEqual(chess_game.get_winner(st), [])
+
+    def test_unbounded_line_read_capped(self):
+        import io
+        from core.room import MAX_LINE_LENGTH
+
+        class DummySocket:
+            def __init__(self, data):
+                self.rfile = io.BytesIO(data)
+                self.wfile = io.BytesIO()
+            def setsockopt(self, *args): pass
+            def settimeout(self, *args): pass
+            def makefile(self, mode, encoding="utf-8"):
+                return io.TextIOWrapper(self.rfile, encoding=encoding)
+            def sendall(self, data):
+                self.wfile.write(data)
+            def getpeername(self):
+                return ("127.0.0.1", 12345)
+            def close(self): pass
+
+        room = Room("Host", bingo)
+        oversized = b"X" * (MAX_LINE_LENGTH + 500) + b"\n"
+        sock = DummySocket(oversized)
+        room.client_handler(sock)
+        # Client exceeded MAX_LINE_LENGTH and was immediately dropped
+        self.assertEqual(len(room.players), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

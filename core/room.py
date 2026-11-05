@@ -14,6 +14,9 @@ from utils.validation import clean_name
 SURRENDER_COMMANDS = {"!ff", "!surrender", "!giveup", "!quit", "!exit", "ff", "surrender", "giveup", "quit", "exit", "resign"}
 
 
+MAX_LINE_LENGTH = 65536
+
+
 class Room:
     def __init__(self, host_name, game_module):
         self.lock = threading.RLock()
@@ -143,8 +146,8 @@ class Room:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             sock.settimeout(10)
             reader = sock.makefile("r", encoding="utf-8")
-            first = reader.readline()
-            if not first:
+            first = reader.readline(MAX_LINE_LENGTH + 1)
+            if not first or len(first) > MAX_LINE_LENGTH:
                 return
 
             request = decode_message(first)
@@ -176,7 +179,12 @@ class Room:
             print(f"\n  + {player.name} joined from {where} ({len(names)}/{self.max_players} players: {', '.join(names)})")
             self.broadcast({"type": "lobby", "players": self.lobby_payload()})
 
-            for line in reader:
+            while True:
+                line = reader.readline(MAX_LINE_LENGTH + 1)
+                if not line:
+                    break
+                if len(line) > MAX_LINE_LENGTH:
+                    raise ValueError(f"Payload from {player.name} exceeded max line length.")
                 message = decode_message(line)
                 if not message:
                     continue
@@ -193,15 +201,20 @@ class Room:
                         if chat_text.lower() in SURRENDER_COMMANDS:
                             self.surrender_queue.put(pid)
                         elif chat_text.lower().startswith("!game "):
-                            g_name = chat_text[6:].strip().lower()
-                            from games import GAMES_REGISTRY
-                            if g_name in GAMES_REGISTRY:
-                                self.game_module = GAMES_REGISTRY[g_name]
-                                self.max_players = self.game_module.max_players
-                                self.min_players = self.game_module.min_players
-                                self.broadcast({"type": "notice", "message": f"🎮 {player.name} selected {self.game_module.game_name}!"})
-                                self.broadcast({"type": "lobby", "players": self.lobby_payload()})
-                        elif chat_text.lower() in {"!start", "s", "start"} and pid in [0, 1]:
+                            if not self.started and player.is_host:
+                                g_name = chat_text[6:].strip().lower()
+                                from games import GAMES_REGISTRY
+                                if g_name in GAMES_REGISTRY:
+                                    self.game_module = GAMES_REGISTRY[g_name]
+                                    self.max_players = self.game_module.max_players
+                                    self.min_players = self.game_module.min_players
+                                    self.broadcast({"type": "notice", "message": f"🎮 {player.name} selected {self.game_module.game_name}!"})
+                                    self.broadcast({"type": "lobby", "players": self.lobby_payload()})
+                            elif not player.is_host:
+                                self.send(pid, {"type": "notice", "message": "⚠️ Only the host can change the game."})
+                            elif self.started:
+                                self.send(pid, {"type": "notice", "message": "⚠️ Cannot change game while a match is in progress."})
+                        elif chat_text.lower() in {"!start", "s", "start"} and player.is_host:
                             self.started = True
                         else:
                             entry = f"💬 {player.name}: {chat_text}"
