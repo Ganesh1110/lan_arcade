@@ -10,7 +10,8 @@ from collections import deque
 from config import clear_screen, paint, play_sound
 from games import (
     connect4, tic_tac_toe, battleship, snake_and_ladder, game2048, shiritori,
-    wordle, quiz_show, typing_racer, artillery, snake_duel, chess_game, arrow_man
+    wordle, quiz_show, typing_racer, artillery, snake_duel, chess_game, arrow_man,
+    memory_match
 )
 from utils.input import read_direct_key
 from utils.dictionary import get_words_set
@@ -1437,3 +1438,186 @@ def _play_bingo(name, rematch_count=0):
 
 def run_bingo_vs_ai():
     return run_with_rematch(_play_bingo, "Bingo — vs Computer Bot", "Player")
+
+
+# ==========================================
+# 15. MEMORY MATCH VS MEMORY BOT
+# ==========================================
+def _get_best_memory_match_move(state, bot_id=1, bot_memory=None, human_like=True):
+    """
+    Bot AI for Memory Match with imperfect probabilistic memory.
+    - If bot knows a matching pair in memory: picks it.
+    - Otherwise reveals one unknown card, and tries a known-match for the second flip,
+      else a random unknown card.
+    - Exposes human_like parameter: when True, memory retention is ~70%; when False, 100%.
+    - Guarantees picking 2 distinct, currently unmatched cards.
+    """
+    rows = state["rows"]
+    cols = state["cols"]
+    matched_raw = state.get("matched", set())
+    matched_set = {(m[0], m[1]) for m in matched_raw} if isinstance(matched_raw, list) else set(matched_raw)
+    available = [(r, c) for r in range(rows) for c in range(cols) if (r, c) not in matched_set]
+
+    if len(available) < 2:
+        return None
+
+    if bot_memory is None:
+        bot_memory = {}
+
+    # Prune already matched cards from bot memory
+    for c in list(bot_memory.keys()):
+        if c in matched_set:
+            del bot_memory[c]
+
+    # 1. Check if bot knows a matching pair in memory
+    sym_to_coords = {}
+    for coord, sym in bot_memory.items():
+        if coord in available:
+            sym_to_coords.setdefault(sym, []).append(coord)
+
+    known_pairs = [coords for coords in sym_to_coords.values() if len(coords) >= 2]
+    if known_pairs:
+        pair = random.choice(known_pairs)
+        c1, c2 = pair[0], pair[1]
+        c1_str = f"{chr(ord('A') + c1[1])}{c1[0] + 1}"
+        c2_str = f"{chr(ord('A') + c2[1])}{c2[0] + 1}"
+        return {"card1": c1, "card2": c2, "c1_str": c1_str, "c2_str": c2_str}
+
+    # 2. Pick first card: prioritize unknown cards not yet in memory
+    unknown = [c for c in available if c not in bot_memory]
+    if unknown:
+        c1 = random.choice(unknown)
+    else:
+        c1 = random.choice(available)
+
+    # 3. Pick second card: try to find a known match for c1's symbol in bot_memory
+    sym1 = None
+    if "board" in state and state["board"] and state["board"][c1[0]][c1[1]] is not None:
+        sym1 = state["board"][c1[0]][c1[1]]
+    elif c1 in bot_memory:
+        sym1 = bot_memory[c1]
+
+    matching_in_mem = []
+    if sym1 is not None:
+        matching_in_mem = [
+            coord for coord, sym in bot_memory.items()
+            if sym == sym1 and coord != c1 and coord in available
+        ]
+
+    recall_prob = 0.70 if human_like else 1.0
+    if matching_in_mem and random.random() < recall_prob:
+        c2 = matching_in_mem[0]
+    else:
+        # Otherwise pick another unknown card if possible, else any other available card
+        other_available = [c for c in available if c != c1]
+        other_unknown = [c for c in other_available if c not in bot_memory]
+        if other_unknown:
+            c2 = random.choice(other_unknown)
+        else:
+            c2 = random.choice(other_available)
+
+    c1_str = f"{chr(ord('A') + c1[1])}{c1[0] + 1}"
+    c2_str = f"{chr(ord('A') + c2[1])}{c2[0] + 1}"
+    return {"card1": c1, "card2": c2, "c1_str": c1_str, "c2_str": c2_str}
+
+
+def _update_bot_memory(bot_memory, last_reveal_or_view, matched_set=None, human_like=True):
+    """Update bot's memory based on last revealed cards with probabilistic retention."""
+    if not last_reveal_or_view:
+        return
+
+    if isinstance(last_reveal_or_view, dict) and ("board" in last_reveal_or_view or "players" in last_reveal_or_view):
+        last_reveal = last_reveal_or_view.get("last_reveal")
+        if matched_set is None:
+            m = last_reveal_or_view.get("matched", set())
+            matched_set = {(item[0], item[1]) for item in m} if isinstance(m, list) else set(m)
+    else:
+        last_reveal = last_reveal_or_view
+        if matched_set is None:
+            matched_set = set()
+
+    if not last_reveal:
+        return
+
+    recall_prob = 0.70 if human_like else 1.0
+
+    if last_reveal.get("matched"):
+        c1 = last_reveal.get("card1", {})
+        c2 = last_reveal.get("card2", {})
+        pos1 = (c1.get("row"), c1.get("col"))
+        pos2 = (c2.get("row"), c2.get("col"))
+        bot_memory.pop(pos1, None)
+        bot_memory.pop(pos2, None)
+    else:
+        for card_data in [last_reveal.get("card1", {}), last_reveal.get("card2", {})]:
+            r = card_data.get("row")
+            c = card_data.get("col")
+            sym = card_data.get("symbol")
+            if r is not None and c is not None and sym is not None:
+                pos = (r, c)
+                if pos not in matched_set:
+                    if random.random() < recall_prob:
+                        bot_memory[pos] = sym
+                    else:
+                        bot_memory.pop(pos, None)
+
+
+def _play_memory_match(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "MemoryBot 🧠"}, {"id": 0, "name": name}] if bot_first else [{"id": 0, "name": name}, {"id": 1, "name": "MemoryBot 🧠"}]
+    state = memory_match.create_state(sessions)
+    bot_memory = {}
+
+    while not memory_match.is_over(state):
+        curr_id = memory_match.current_player(state)
+        clear_screen()
+        v = memory_match.view_for(state, 0)
+        print(memory_match.render_dashboard(v))
+
+        if curr_id == 0:
+            play_sound("turn")
+            while True:
+                raw = input(f"\n  ▶ YOUR TURN ({name}) — Pick two cards (e.g. A1 C3) or 'q' to quit: ").strip()
+                if raw.lower() in {"q", "quit", "exit"}:
+                    return None
+                valid, action_or_err = memory_match.parse_action(state, 0, raw)
+                if valid:
+                    events = memory_match.apply_action(state, 0, action_or_err)
+                    _update_bot_memory(bot_memory, state.get("last_reveal"), state["matched"], human_like=True)
+                    break
+                print(paint(f"  ! {action_or_err}", "1;31"))
+        else:
+            print("\n  🧠 MemoryBot is recalling card locations and scanning the grid...")
+            time.sleep(1.0)
+            bot_action = _get_best_memory_match_move(state, bot_id=1, bot_memory=bot_memory, human_like=True)
+            if bot_action:
+                events = memory_match.apply_action(state, 1, bot_action)
+                _update_bot_memory(bot_memory, state.get("last_reveal"), state["matched"], human_like=True)
+            else:
+                break
+
+    clear_screen()
+    v = memory_match.view_for(state, 0)
+    winners = memory_match.get_winner(state)
+    my_sc = state["scores"].get(0, 0)
+    bot_sc = state["scores"].get(1, 0)
+    if winners and name in winners:
+        msg = f"🏆 VICTORY! {name} found {my_sc} pairs and outsmarted MemoryBot ({bot_sc} pairs)!"
+        play_sound("win")
+    elif winners:
+        msg = f"💀 DEFEAT! MemoryBot remembered {bot_sc} pairs vs your {my_sc} pairs!"
+    else:
+        msg = f"🤝 Memory duel ended in a tie ({my_sc} - {bot_sc})!"
+
+    print(memory_match.render_final(v, msg, winners))
+    play_sound("win")
+    record_match_outcome("Memory Match (vs Bot)", [name, "MemoryBot 🧠"], winners)
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_memory_match_vs_ai():
+    return run_with_rematch(_play_memory_match, "Memory Match — vs MemoryBot 🧠", "Player")

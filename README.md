@@ -39,7 +39,7 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
 - **Host-Authoritative Architecture**: The host machine manages game state, move validation, turn progression, and scoring.
 - **Privacy Enforcement**: Private game information (e.g., secret word in Hangman, hidden fleets in Battleship) is strictly filtered before being sent to individual player clients.
 - **Unified Game Framework**: All games share the same TCP networking, room management, lobby system, and message protocol.
-- **21 Supported Games**:
+- **22 Supported Games**:
   1. **Bingo 1–25** (2–4 Players) - Number calling, complete line detection, solo vs PC mode, local pass-and-play.
   2. **Connect Four** (2 Players) - Classic 6x7 strategy board game.
   3. **Battleship** (2 Players) - Hidden 5x5 grids and coordinate targeting.
@@ -61,19 +61,20 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
   19. **Snake Duel** (2 Players) - Tron-style grid slither duel with fruit growth.
   20. **Chess** (2 Players) - Full 8x8 standard chess with checkmate, castling, en passant, and promotion.
   21. **Arrow Man Duel** (2 Players) - Turn-based bowman archery duel with dynamic wind, special quivers, and randomized tower elevations.
+  22. **Memory Match** (2–4 Players) - Card flipping pair matching game with dynamic grid sizes (4x4 or 4x5), imperfect memory bot, and hidden-information enforcement.
 - **In-Game Forfeit / Surrender & Live Chat**: Any player can type `!ff` / `!surrender` / `!giveup` / `!quit` at any time to forfeit a match, or `! <message>` to chat with room players.
-- **Instant Rematch / Play Again Flow**: End-of-match instant rematches across all 21 games with no name re-entry or menu navigation (`R`/`Enter` to Rematch, `M` for Solo Menu, `Q` for Main Menu).
+- **Instant Rematch / Play Again Flow**: End-of-match instant rematches across all 22 games with no name re-entry or menu navigation (`R`/`Enter` to Rematch, `M` for Solo Menu, `Q` for Main Menu).
 - **Zero External Dependencies**: Runs entirely on Python 3.9+ standard library.
 
 ---
 
 ## 🔄 Instant Rematch & Post-Match Controls
 
-College LAN Arcade features a seamless zero-friction Rematch flow across **all 21 games** in both Solo and LAN Multiplayer modes:
+College LAN Arcade features a seamless zero-friction Rematch flow across **all 22 games** in both Solo and LAN Multiplayer modes:
 
 ### Solo & Offline Practice Modes
 When any solo match finishes:
-- **`[Enter]` or `R`**: **Rematch** — Immediately starts a new match with the same player name and a fresh, randomized board/state (target word in Wordle, question sets in Quiz, wind/terrain in Artillery & Arrow Man, etc.).
+- **`[Enter]` or `R`**: **Rematch** — Immediately starts a new match with the same player name and a fresh, randomized board/state (target word in Wordle, question sets in Quiz, wind/terrain in Artillery & Arrow Man, shuffled cards in Memory Match, etc.).
   - Alternates the starting player turn on each rematch (and swaps White/Black colors in Chess).
   - Displays a running session score (e.g. `Session: You 2 - 1 Bot`).
 - **`M`**: **Solo Menu** — Return to the solo game selection menu.
@@ -134,6 +135,10 @@ When a multiplayer match concludes:
 ### 9. Snake & Ladders (1–100)
 - **Rules**: Take turns rolling a 6-sided die to advance across a 100-square board. Climb ladders to jump ahead, watch out for snakes sliding you down! Rolling a 6 grants an **extra turn**. First to reach Square 100 (exact roll required) wins!
 - **Input Format**: Press `[ENTER]` or type `r` to roll.
+
+### 10. Memory Match
+- **Rules**: Take turns flipping two face-down cards to find matching emoji pairs (4x4 grid with 8 pairs for 2 players, 4x5 grid with 10 pairs for 3–4 players). Finding a match scores 1 point and awards an **extra turn**! Mismatched cards flip back face-down and the turn passes. The game ends when all pairs are found; the player with the most pairs wins!
+- **Input Format**: Pick two card coordinates in one turn, e.g. `A1 C3` (or `A1,C3`). Columns are letters (A–D/E), rows are numbers (1–4).
 
 ---
 

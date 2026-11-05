@@ -5,7 +5,7 @@ from games import (
     shiritori, game2048,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
     chess_game, wordle, quiz_show, typing_racer,
-    artillery, snake_duel, sonar
+    artillery, snake_duel, sonar, arrow_man, memory_match
 )
 
 ALL_GAMES = [
@@ -14,7 +14,7 @@ ALL_GAMES = [
     shiritori, game2048,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
     chess_game, wordle, quiz_show, typing_racer,
-    artillery, snake_duel, sonar
+    artillery, snake_duel, sonar, arrow_man, memory_match
 ]
 
 
@@ -96,6 +96,10 @@ class TestAllGamesContract(unittest.TestCase):
                 raw_input = "W"
             elif g == sonar:
                 raw_input = "MOVE N"
+            elif g == arrow_man:
+                raw_input = "45 70"
+            elif g == memory_match:
+                raw_input = "A1 A2"
 
             # Parse action on state
             valid_st, act_st = g.parse_action(state, curr_pid, raw_input)

@@ -27,7 +27,8 @@ from core.solo_modes import (
     run_snake_duel_vs_ai,
     run_chess_vs_ai,
     run_arrow_man_vs_ai,
-    run_bingo_vs_ai
+    run_bingo_vs_ai,
+    run_memory_match_vs_ai
 )
 from utils.stats import render_hall_of_fame
 from games import (
@@ -36,7 +37,7 @@ from games import (
     shiritori, game2048,
     boggle, mini_crossword, wordoku, scrabble_sprint, snake_and_ladder,
     chess_game, wordle, quiz_show, typing_racer,
-    artillery, snake_duel, sonar, arrow_man
+    artillery, snake_duel, sonar, arrow_man, memory_match
 )
 
 
@@ -65,6 +66,7 @@ def host_menu():
             f"Snake Duel / Tron Lightcycles ({snake_duel.min_players} players)",
             f"Sonar Submarine Radar Hunt ({sonar.min_players} players)",
             f"Arrow Man Duel / Bowman Archery ({arrow_man.min_players} players)",
+            f"Memory Match ({memory_match.min_players}–{memory_match.max_players} players)",
             "Back to Main Menu"
         ]
         print(render_menu("HOST A LAN GAME", options))
@@ -78,7 +80,6 @@ def host_menu():
             break
         elif choice == "3":
             host_lan_game_session(battleship)
-            break
         elif choice == "4":
             host_lan_game_session(dots_and_boxes)
             break
@@ -133,10 +134,13 @@ def host_menu():
         elif choice == "21":
             host_lan_game_session(arrow_man)
             break
-        elif choice == "22" or choice.lower() in {"q", "back", "exit"}:
+        elif choice == "22":
+            host_lan_game_session(memory_match)
+            break
+        elif choice == "23" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–22.")
+            print("Please enter 1–23.")
             input("Press Enter to continue...")
 
 
@@ -158,6 +162,7 @@ def solo_menu():
             "Snake Duel (vs TronBot ⚡)",
             "Chess (vs ChessBot ♟️)",
             "Arrow Man Duel (vs RobinBot 🏹)",
+            "Memory Match (vs MemoryBot 🧠)",
             "Back to Main Menu"
         ]
         print(render_menu("SOLO & OFFLINE ARCADE", options))
@@ -192,10 +197,12 @@ def solo_menu():
             res = run_chess_vs_ai()
         elif choice == "14":
             res = run_arrow_man_vs_ai()
-        elif choice == "15" or choice.lower() in {"q", "back", "exit"}:
+        elif choice == "15":
+            res = run_memory_match_vs_ai()
+        elif choice == "16" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–15.")
+            print("Please enter 1–16.")
             input("Press Enter to continue...")
             continue
 
