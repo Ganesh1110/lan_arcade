@@ -14,67 +14,67 @@ GRID_SIZE = 5
 
 PUZZLES = [
     {
-        "theme": "Everyday Tech & Nature",
-        "grid": ["APPLE", "LOGIC", "SMART", "CODES", "TRAIN"],
+        "theme": "Heart & Soul",
+        "grid": ["HEART", "EMBER", "ABUSE", "RESIN", "TREND"],
         "clues": {
-            "1A": ("Row 1", "Red orchard fruit or tech giant", "APPLE"),
-            "2A": ("Row 2", "Reasoning principles or boolean gates", "LOGIC"),
-            "3A": ("Row 3", "Clever and quick-witted", "SMART"),
-            "4A": ("Row 4", "Written programs or secret ciphers", "CODES"),
-            "5A": ("Row 5", "Locomotive on railway tracks", "TRAIN"),
-            "1D": ("Col 1", "Down letters: A-L-S-C-T", "ALSCT"),
-            "2D": ("Col 2", "Down letters: P-O-M-O-R", "POMOR"),
-            "3D": ("Col 3", "Down letters: P-G-A-D-A", "PGADA"),
-            "4D": ("Col 4", "Down letters: L-I-R-E-I", "LIREI"),
-            "5D": ("Col 5", "Down letters: E-C-T-S-N", "ECTSN"),
+            "1A": ("Row 1", "Muscular pump in the chest or symbol of love", "HEART"),
+            "2A": ("Row 2", "Glowing coal left behind in a dying hearth", "EMBER"),
+            "3A": ("Row 3", "Misuse, improper treatment, or corrupt conduct", "ABUSE"),
+            "4A": ("Row 4", "Sticky amber fluid secreted by pine trees", "RESIN"),
+            "5A": ("Row 5", "General direction in which things are developing", "TREND"),
+            "1D": ("Col 1", "Core vital organ that sustains human life", "HEART"),
+            "2D": ("Col 2", "Smoldering fragment of hot charred wood", "EMBER"),
+            "3D": ("Col 3", "Cruel or excessively harmful exploitation", "ABUSE"),
+            "4D": ("Col 4", "Natural organic varnish and rosin polymer", "RESIN"),
+            "5D": ("Col 5", "Viral craze or popular modern fashion", "TREND"),
         }
     },
     {
-        "theme": "Space & Cosmic Elements",
-        "grid": ["SOLAR", "ORBIT", "COMET", "EARTH", "SPACE"],
+        "theme": "Wings & Wilderness",
+        "grid": ["CRANE", "RIVAL", "AVOID", "NAIVE", "ELDER"],
         "clues": {
-            "1A": ("Row 1", "Pertaining to our sun or radiation", "SOLAR"),
-            "2A": ("Row 2", "Curved gravitational path of a planet", "ORBIT"),
-            "3A": ("Row 3", "Icy celestial body with a glowing tail", "COMET"),
-            "4A": ("Row 4", "Our home blue marble planet", "EARTH"),
-            "5A": ("Row 5", "The infinite final frontier", "SPACE"),
-            "1D": ("Col 1", "Down letters: S-O-C-E-S", "SOCES"),
-            "2D": ("Col 2", "Down letters: O-R-O-A-P", "OROAP"),
-            "3D": ("Col 3", "Down letters: L-B-M-R-A", "LBMRA"),
-            "4D": ("Col 4", "Down letters: A-I-E-T-C", "AIETC"),
-            "5D": ("Col 5", "Down letters: R-T-T-H-E", "RTTHE"),
+            "1A": ("Row 1", "Long-legged wading bird or harbor hoisting machine", "CRANE"),
+            "2A": ("Row 2", "Fierce adversary or challenger in competition", "RIVAL"),
+            "3A": ("Row 3", "Steer clear of, evade, or shun", "AVOID"),
+            "4A": ("Row 4", "Innocent, gullible, or lacking worldly experience", "NAIVE"),
+            "5A": ("Row 5", "Venerable senior member of a family or clan", "ELDER"),
+            "1D": ("Col 1", "Tall mechanical derrick lifting construction loads", "CRANE"),
+            "2D": ("Col 2", "Close opponent fighting for the same trophy", "RIVAL"),
+            "3D": ("Col 3", "Stay away from or dodge neatly", "AVOID"),
+            "4D": ("Col 4", "Showing lack of critical cynicism; ingenuous", "NAIVE"),
+            "5D": ("Col 5", "Respected village patriarch or older shrub", "ELDER"),
         }
     },
     {
-        "theme": "Ocean & Wilderness",
-        "grid": ["OCEAN", "CORAL", "TIGER", "RIVER", "BEACH"],
+        "theme": "Logic & Discovery",
+        "grid": ["SOLVE", "ONION", "LIMIT", "VOICE", "ENTER"],
         "clues": {
-            "1A": ("Row 1", "Vast body of saltwater covering Earth", "OCEAN"),
-            "2A": ("Row 2", "Marine reef-building invertebrate colony", "CORAL"),
-            "3A": ("Row 3", "Striped apex jungle feline", "TIGER"),
-            "4A": ("Row 4", "Flowing freshwater natural stream", "RIVER"),
-            "5A": ("Row 5", "Sandy coastal strip by the waves", "BEACH"),
-            "1D": ("Col 1", "Down letters: O-C-T-R-B", "OCTRB"),
-            "2D": ("Col 2", "Down letters: C-O-I-I-E", "COIIE"),
-            "3D": ("Col 3", "Down letters: E-R-G-V-A", "ERGVA"),
-            "4D": ("Col 4", "Down letters: A-A-E-E-C", "AAEEC"),
-            "5D": ("Col 5", "Down letters: N-L-R-R-H", "NLRRH"),
+            "1A": ("Row 1", "Unravel a mystery or find the solution to a riddle", "SOLVE"),
+            "2A": ("Row 2", "Pungent edible bulb that causes kitchen tears", "ONION"),
+            "3A": ("Row 3", "Upper boundary, speed cap, or threshold", "LIMIT"),
+            "4A": ("Row 4", "Sound emitted from vocal chords during speech", "VOICE"),
+            "5A": ("Row 5", "Walk into a room, or key pressed to submit", "ENTER"),
+            "1D": ("Col 1", "Crack an algorithmic problem or math equation", "SOLVE"),
+            "2D": ("Col 2", "Layered root vegetable sautéed in savory soups", "ONION"),
+            "3D": ("Col 3", "Maximum allowable measure or ceiling constraint", "LIMIT"),
+            "4D": ("Col 4", "Singing tone or spoken expression", "VOICE"),
+            "5D": ("Col 5", "Pass through a doorway into a chamber", "ENTER"),
         }
     },
     {
-        "theme": "College & Campus Life",
-        "grid": ["BOOKS", "STUDY", "GRADE", "LEARN", "CLASS"],
+        "theme": "Campus & Energy",
+        "grid": ["BLAST", "LUNCH", "ANGER", "SCENE", "THREE"],
         "clues": {
-            "1A": ("Row 1", "Bound pages in the university library", "BOOKS"),
-            "2A": ("Row 2", "Review materials before midterms", "STUDY"),
-            "3A": ("Row 3", "Letter mark from A to F on an exam", "GRADE"),
-            "4A": ("Row 4", "Acquire new knowledge or skill", "LEARN"),
-            "5A": ("Row 5", "Lecture session in a hall", "CLASS"),
-            "1D": ("Col 1", "Down letters: B-S-G-L-C", "BSGLC"),
-            "2D": ("Col 2", "Down letters: O-T-R-E-L", "OTREL"),
-            "3D": ("Col 3", "Down letters: O-U-A-A-A", "OUAAA"),
-            "4D": ("Col 4", "Down letters: K-D-D-R-S", "KDDRS"),
-            "5D": ("Col 5", "Down letters: S-Y-E-N-S", "SYENS"),
+            "1A": ("Row 1", "Sudden loud explosion or intense sonic burst", "BLAST"),
+            "2A": ("Row 2", "Midday cafeteria meal enjoyed with classmates", "LUNCH"),
+            "3A": ("Row 3", "Intense feeling of wrath or sharp irritation", "ANGER"),
+            "4A": ("Row 4", "Dramatic episode or view on a theater stage", "SCENE"),
+            "5A": ("Row 5", "Number of sides on a geometric triangle", "THREE"),
+            "1D": ("Col 1", "Powerful shockwave or fun energetic gathering", "BLAST"),
+            "2D": ("Col 2", "Noontime sandwich break between classes", "LUNCH"),
+            "3D": ("Col 3", "Furious emotional rage or indignant hostility", "ANGER"),
+            "4D": ("Col 4", "Setting of an action or theatrical segment", "SCENE"),
+            "5D": ("Col 5", "Smallest odd prime integer", "THREE"),
         }
     }
 ]
@@ -141,13 +141,13 @@ def view_for(state, player_id):
 
 
 def prompt_for(state_or_view, player_id):
-    return "Enter clue and word, e.g. Across '1A APPLE' or Down '1D ALSCT'"
+    return "Enter clue and word, e.g. Across '1A HEART' or Down '1D HEART'"
 
 
 def parse_action(state_or_view, player_id, raw_input):
     parts = str(raw_input).strip().upper().split()
     if len(parts) != 2:
-        return False, "Format: '<clue_num> <word>' (e.g. '1A APPLE' or '1D ALSCT')."
+        return False, "Format: '<clue_num> <word>' (e.g. '1A HEART' or '1D HEART')."
 
     clue, word = parts[0], parts[1]
 
@@ -223,7 +223,7 @@ def render_dashboard(view):
     my_board = view.get("my_board", [["."] * GRID_SIZE for _ in range(GRID_SIZE)])
     my_solved = view.get("my_solved", 0)
     opp_solved = view.get("opp_solved", 0)
-    theme = view.get("theme", "Everyday Tech & Nature")
+    theme = view.get("theme", "Heart & Soul")
     clues = view.get("clues", {})
     log = view.get("log", [])
 

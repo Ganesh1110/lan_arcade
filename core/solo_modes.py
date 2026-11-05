@@ -1184,7 +1184,7 @@ def run_chess_vs_ai():
     elif winners:
         msg = "💀 DEFEAT! ChessBot checkmated you!"
     else:
-        msg = "🤝 Match drawn by stalemate!"
+        msg = "🤝 Match drawn!"
     print(chess_game.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Chess (vs Bot)", [name, "ChessBot ♟️"], winners)

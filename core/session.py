@@ -13,6 +13,7 @@ class PlayerSession:
         self.is_ready = True if is_host else False
         self.send_lock = threading.Lock()
         self.is_online = True
+        self.has_surrendered = False
         self.wins = 0
         self.losses = 0
 

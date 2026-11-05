@@ -72,6 +72,36 @@ class TestChessGame(unittest.TestCase):
         self.assertIn("Bishop (B)", dash)
         self.assertIn("Soldier/Pawn (P)", dash)
 
+    def test_draw_by_insufficient_material(self):
+        # King vs King: immediate draw on move
+        self.state["board"] = [[None] * 8 for _ in range(8)]
+        self.state["board"][7][4] = "K"
+        self.state["board"][0][4] = "k"
+        valid, act = chess_game.parse_action(self.state, 0, "e1e2")
+        self.assertTrue(valid)
+        chess_game.apply_action(self.state, 0, act)
+        self.assertTrue(chess_game.is_over(self.state))
+        self.assertEqual(chess_game.get_winner(self.state), [])
+
+    def test_draw_by_fifty_move_rule(self):
+        self.state["halfmove_clock"] = 99
+        valid, act = chess_game.parse_action(self.state, 0, "g1f3")
+        self.assertTrue(valid)
+        chess_game.apply_action(self.state, 0, act)
+        self.assertTrue(chess_game.is_over(self.state))
+        self.assertEqual(chess_game.get_winner(self.state), [])
+
+    def test_draw_by_threefold_repetition(self):
+        # Repeat moves to trigger 3rd occurrence of same position
+        seq = ["Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"]
+        for m in seq:
+            pid = chess_game.current_player(self.state)
+            v, act = chess_game.parse_action(self.state, pid, m)
+            self.assertTrue(v)
+            chess_game.apply_action(self.state, pid, act)
+        self.assertTrue(chess_game.is_over(self.state))
+        self.assertEqual(chess_game.get_winner(self.state), [])
+
 
 if __name__ == "__main__":
     unittest.main()

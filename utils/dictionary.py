@@ -53,22 +53,75 @@ def get_words_set():
     })
 
     # Generate regular inflections (plurals, past tense, present participles)
-    # so standard forms like CATS, BOOKS, GAMES, PLAYED are fully recognized
+    # only from genuine base forms, handling consonant doubling properly.
+    vowels = set("AEIOU")
+    never_double = set("WXYHJKQ")
+
+    def _should_double_consonant(w):
+        if len(w) < 3:
+            return False
+        c = w[-1]
+        if c in vowels or c in never_double:
+            return False
+        v = w[-2]
+        if v not in vowels:
+            return False
+        if len(w) >= 3 and w[-3] in vowels:
+            return False
+        return True
+
+    def _is_already_inflected(w):
+        if w.endswith("ING"):
+            if w[:-3] in words or (w[:-3] + "E") in words:
+                return True
+            if len(w) >= 5 and w[-4] == w[-5] and w[:-4] in words:
+                return True
+        if w.endswith("ED"):
+            if w[:-1] in words or w[:-2] in words:
+                return True
+            if len(w) >= 5 and w[-3] == w[-4] and w[:-3] in words:
+                return True
+        if w.endswith("S"):
+            if w[:-1] in words:
+                return True
+            if w.endswith("ES") and w[:-2] in words:
+                return True
+            if w.endswith("IES") and (w[:-3] + "Y") in words:
+                return True
+        return False
+
     inflections = set()
     for w in words:
-        if 2 <= len(w) <= 12:
+        if not (2 <= len(w) <= 12):
+            continue
+        # Do not inflect words that end in participle or past-tense suffixes
+        if w.endswith(("ING", "ED")):
+            continue
+        # Do not inflect already inflected forms
+        if _is_already_inflected(w):
+            continue
+
+        # 1. Plural / 3rd-person singular
+        if w.endswith(("S", "X", "Z", "CH", "SH")):
+            inflections.add(w + "ES")
+        elif w.endswith("Y") and len(w) > 2 and not w.endswith(("AY", "EY", "OY", "UY")):
+            inflections.add(w[:-1] + "IES")
+        else:
             inflections.add(w + "S")
-            if w.endswith(("S", "X", "Z", "CH", "SH")):
-                inflections.add(w + "ES")
-            if w.endswith("Y") and len(w) > 2 and not w.endswith(("AY", "EY", "OY", "UY")):
-                inflections.add(w[:-1] + "IES")
-                inflections.add(w[:-1] + "IED")
-            elif w.endswith("E"):
-                inflections.add(w + "D")
-                inflections.add(w[:-1] + "ING")
-            else:
-                inflections.add(w + "ED")
-                inflections.add(w + "ING")
+
+        # 2. Past tense and present participle
+        if w.endswith("E"):
+            inflections.add(w + "D")
+            inflections.add(w[:-1] + "ING")
+        elif w.endswith("Y") and len(w) > 2 and not w.endswith(("AY", "EY", "OY", "UY")):
+            inflections.add(w[:-1] + "IED")
+            inflections.add(w + "ING")
+        elif _should_double_consonant(w):
+            inflections.add(w + w[-1] + "ED")
+            inflections.add(w + w[-1] + "ING")
+        else:
+            inflections.add(w + "ED")
+            inflections.add(w + "ING")
 
     words.update(inflections)
     _WORDS = words
@@ -80,24 +133,7 @@ def is_valid_word(word):
     if not word or not isinstance(word, str):
         return False
     w = word.strip().upper()
-    words_set = get_words_set()
-    if w in words_set:
-        return True
-
-    # Rule-based fallback check for standard regular inflections
-    if w.endswith("S") and len(w) > 2:
-        if w[:-1] in words_set:
-            return True
-        if w.endswith("ES") and len(w) > 3 and w[:-2] in words_set:
-            return True
-    if w.endswith("ED") and len(w) > 3:
-        if w[:-2] in words_set or w[:-1] in words_set:
-            return True
-    if w.endswith("ING") and len(w) > 4:
-        if w[:-3] in words_set or (w[:-3] + "E") in words_set:
-            return True
-
-    return False
+    return w in get_words_set()
 
 
 def find_anagrams(rack, min_len=3, max_results=20):

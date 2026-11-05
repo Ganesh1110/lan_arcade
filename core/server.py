@@ -46,7 +46,7 @@ def handle_surrender(room, gm, surr_pid):
     ]
 
     # In 3-4 player games with 2+ players still competing, eliminate surrendering player and continue!
-    if len(active_remaining) > 1 and surr_pid != 0:
+    if len(active_remaining) > 1:
         notice = f"🏳️ {surr_name} surrendered and is eliminated! Match continues with remaining players."
         room.log.append(notice)
         room.broadcast({"type": "notice", "message": notice})
@@ -108,6 +108,10 @@ def play_lan_host(room):
     """Host authoritative main game loop."""
     gm = GameManager(room.game_module)
     gm.initialize(room.players)
+
+    # Reset surrender flag for all players at the start of each game/rematch
+    for p in room.players:
+        p.has_surrendered = False
 
     # Clean state for new game / rematch
     room.drain_moves()

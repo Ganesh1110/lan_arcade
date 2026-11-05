@@ -337,6 +337,61 @@ def get_legal_moves(board, is_white, state=None):
     return legal_moves
 
 
+def _get_position_key(board, next_turn_is_white, state):
+    board_tuple = tuple(tuple(row) for row in board)
+    has_moved = state.get("has_moved", {})
+    castling_rights = (
+        not has_moved.get("K", False) and not has_moved.get("R_h1", False),
+        not has_moved.get("K", False) and not has_moved.get("R_a1", False),
+        not has_moved.get("k", False) and not has_moved.get("r_h8", False),
+        not has_moved.get("k", False) and not has_moved.get("r_a8", False),
+    )
+    ep_target = state.get("en_passant_target")
+    return (board_tuple, next_turn_is_white, castling_rights, ep_target)
+
+
+def _check_insufficient_material(board):
+    white_minors = []
+    black_minors = []
+    bishops = []
+
+    for r in range(8):
+        for c in range(8):
+            p = board[r][c]
+            if not p:
+                continue
+            if p.upper() in ("P", "R", "Q"):
+                return False
+            if p.isupper():
+                if p != "K":
+                    white_minors.append(p)
+                    if p == "B":
+                        bishops.append(("White", r, c))
+            else:
+                if p != "k":
+                    black_minors.append(p)
+                    if p == "b":
+                        bishops.append(("Black", r, c))
+
+    # K vs K
+    if len(white_minors) == 0 and len(black_minors) == 0:
+        return True
+
+    # K+B vs K or K+N vs K
+    if (len(white_minors) == 1 and len(black_minors) == 0) or (len(white_minors) == 0 and len(black_minors) == 1):
+        return True
+
+    # K+B vs K+B (both bishops on same color square)
+    if len(white_minors) == 1 and len(black_minors) == 1:
+        if white_minors[0] == "B" and black_minors[0] == "b" and len(bishops) == 2:
+            b1_color = (bishops[0][1] + bishops[0][2]) % 2
+            b2_color = (bishops[1][1] + bishops[1][2]) % 2
+            if b1_color == b2_color:
+                return True
+
+    return False
+
+
 def create_state(player_sessions):
     players = []
     for idx, s in enumerate(player_sessions):
@@ -346,19 +401,25 @@ def create_state(player_sessions):
         color = "1;37" if idx == 0 else "1;33"
         players.append({"id": pid, "name": name, "side": side, "color": color})
 
-    return {
+    board = initial_board()
+    st = {
         "players": players,
-        "board": initial_board(),
+        "board": board,
         "turn_index": 0,
         "has_moved": {"K": False, "k": False, "R_a1": False, "R_h1": False, "r_a8": False, "r_h8": False},
         "en_passant_target": None,
         "captured_white": [],  # Black pieces captured by White
         "captured_black": [],  # White pieces captured by Black
         "moves_history": [],
+        "halfmove_clock": 0,
+        "position_counts": {},
         "in_check": False,
         "winner": None,
         "log": ["♔ Chess match started! White moves first."]
     }
+    init_key = _get_position_key(board, True, st)
+    st["position_counts"][init_key] = 1
+    return st
 
 
 def current_player(state):
@@ -573,6 +634,12 @@ def apply_action(state, player_id, action_data):
 
     state["moves_history"].append(f"{curr_p['side'][:1]}: {notat}")
 
+    # 50-move clock: reset on pawn move or capture
+    if target is not None or piece.upper() == "P":
+        state["halfmove_clock"] = 0
+    else:
+        state["halfmove_clock"] = state.get("halfmove_clock", 0) + 1
+
     # Check opponent check / checkmate / stalemate status
     opp_is_white = not is_white
     opp_moves = get_legal_moves(board, opp_is_white, state)
@@ -591,6 +658,23 @@ def apply_action(state, player_id, action_data):
         else:
             state["winner"] = []
             log_entries.append(f"🤝 STALEMATE! {opp_name} has no legal moves. Match is drawn.")
+    elif state.get("winner") is None:
+        # Check insufficient material
+        if _check_insufficient_material(board):
+            state["winner"] = []
+            log_entries.append("🤝 DRAW! Insufficient material to checkmate.")
+        # Check 50-move rule
+        elif state.get("halfmove_clock", 0) >= 100:
+            state["winner"] = []
+            log_entries.append("🤝 DRAW! Fifty-move rule (50 moves without capture or pawn advance).")
+        else:
+            # Check threefold repetition
+            pos_key = _get_position_key(board, opp_is_white, state)
+            state.setdefault("position_counts", {})
+            state["position_counts"][pos_key] = state["position_counts"].get(pos_key, 0) + 1
+            if state["position_counts"][pos_key] >= 3:
+                state["winner"] = []
+                log_entries.append("🤝 DRAW! Threefold repetition of position.")
 
     state["turn_index"] += 1
     state["log"].extend(log_entries)

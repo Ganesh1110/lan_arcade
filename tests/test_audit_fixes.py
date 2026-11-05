@@ -4,10 +4,14 @@ Regression and verification tests for full audit issues and rule fixes.
 import unittest
 from games import (
     wordoku, chess_game, quiz_show, sonar, typing_racer, shiritori,
-    snake_duel, boggle, hangman, snake_and_ladder, arrow_man, mini_crossword
+    snake_duel, boggle, hangman, snake_and_ladder, arrow_man, mini_crossword, bingo
 )
 from utils.dictionary import is_valid_word, get_words_set
 from core.solo_modes import _get_best_chess_move
+from core.room import Room
+from core.session import PlayerSession
+from core.server import handle_surrender, play_lan_host
+from core.game_manager import GameManager
 
 
 class TestAuditFixes(unittest.TestCase):
@@ -129,8 +133,58 @@ class TestAuditFixes(unittest.TestCase):
         self.assertEqual(shiritori.current_player(st), 2)
 
     def test_dictionary_inflections(self):
-        for w in ["CATS", "BOOKS", "GAMES", "PLAYED", "BOX", "BOXES"]:
+        for w in ["CATS", "BOOKS", "GAMES", "PLAYED", "BOX", "BOXES", "HOUSES", "DAYS", "RUNNING", "STOPPED", "HOPPING"]:
             self.assertTrue(is_valid_word(w), f"Word '{w}' should be valid")
+
+    def test_dictionary_rejects_junk_and_repeated_inflections(self):
+        # Prevent junk words from being accepted
+        junk_words = ["BOOKSS", "CATSES", "RUNNINGS", "HOUSESS", "DAYSS", "PLAYEDS", "BOXESS"]
+        for jw in junk_words:
+            self.assertFalse(is_valid_word(jw), f"Junk word '{jw}' should NOT be accepted in dictionary")
+
+    def test_chess_draw_conditions(self):
+        # 1. Insufficient material: K vs K
+        st = chess_game.create_state([{"id": 0, "name": "White"}, {"id": 1, "name": "Black"}])
+        st["board"] = [[None] * 8 for _ in range(8)]
+        st["board"][7][4] = "K"
+        st["board"][0][4] = "k"
+        v, act = chess_game.parse_action(st, 0, "e1e2")
+        self.assertTrue(v)
+        chess_game.apply_action(st, 0, act)
+        self.assertTrue(chess_game.is_over(st))
+        self.assertEqual(chess_game.get_winner(st), [])
+
+        # 2. Insufficient material: K+B vs K
+        st2 = chess_game.create_state([{"id": 0, "name": "White"}, {"id": 1, "name": "Black"}])
+        st2["board"] = [[None] * 8 for _ in range(8)]
+        st2["board"][7][4] = "K"
+        st2["board"][7][2] = "B"
+        st2["board"][0][4] = "k"
+        v2, act2 = chess_game.parse_action(st2, 0, "e1e2")
+        self.assertTrue(v2)
+        chess_game.apply_action(st2, 0, act2)
+        self.assertTrue(chess_game.is_over(st2))
+        self.assertEqual(chess_game.get_winner(st2), [])
+
+        # 3. 50-move rule
+        st3 = chess_game.create_state([{"id": 0, "name": "White"}, {"id": 1, "name": "Black"}])
+        st3["halfmove_clock"] = 99
+        v3, act3 = chess_game.parse_action(st3, 0, "Nb1c3")
+        self.assertTrue(v3)
+        chess_game.apply_action(st3, 0, act3)
+        self.assertTrue(chess_game.is_over(st3))
+        self.assertEqual(chess_game.get_winner(st3), [])
+
+        # 4. Threefold repetition
+        st4 = chess_game.create_state([{"id": 0, "name": "White"}, {"id": 1, "name": "Black"}])
+        moves = ["Nf3", "Nf6", "Ng1", "Ng8", "Nf3", "Nf6", "Ng1", "Ng8"]
+        for m in moves:
+            pid = chess_game.current_player(st4)
+            valid, m_act = chess_game.parse_action(st4, pid, m)
+            self.assertTrue(valid, f"Move {m} failed")
+            chess_game.apply_action(st4, pid, m_act)
+        self.assertTrue(chess_game.is_over(st4))
+        self.assertEqual(chess_game.get_winner(st4), [])
 
     def test_snake_duel_arbitrary_ids(self):
         # Dedicated server / rejoin with IDs 2 and 5
@@ -181,12 +235,56 @@ class TestAuditFixes(unittest.TestCase):
         self.assertTrue(arrow_man.is_over(st))
         self.assertEqual(arrow_man.get_winner(st), ["P1"])
 
-    def test_mini_crossword_across_and_down_clues(self):
+    def test_mini_crossword_across_and_down_entries_are_valid_words(self):
+        # All Down entries in all puzzles must be valid English words, not arbitrary letter scrambles
+        for pz in mini_crossword.PUZZLES:
+            for d_idx in range(1, 6):
+                d_key = f"{d_idx}D"
+                desc, clue_text, word = pz["clues"][d_key]
+                self.assertTrue(is_valid_word(word), f"Down word '{word}' for {d_key} in {pz['theme']} must be a valid word")
+                # Down clue must not just be letter spell-out
+                self.assertNotIn("down letters", clue_text.lower(), f"Clue for {d_key} should be a real clue, not letter spell-out")
+                self.assertNotIn(word, clue_text, f"Clue for {d_key} should not contain the answer")
+
+        # Playing a match: solve with Across and Down clues
         st = mini_crossword.create_state([{"id": 0, "name": "A"}, {"id": 1, "name": "B"}])
-        v_a, _ = mini_crossword.parse_action(st, 0, "1A APPLE")
+        pz = st["puzzle"]
+        # Player A enters correct 1A and 1D
+        w_1a = pz["clues"]["1A"][2]
+        v_a, act_a = mini_crossword.parse_action(st, 0, f"1A {w_1a}")
         self.assertTrue(v_a)
-        v_d, _ = mini_crossword.parse_action(st, 0, "1D ALSCT")
+        res = mini_crossword.apply_action(st, 0, act_a)
+        self.assertIn("SOLVED", res["log"][0])
+
+        w_1d = pz["clues"]["1D"][2]
+        v_d, act_d = mini_crossword.parse_action(st, 1, f"1D {w_1d}")
         self.assertTrue(v_d)
+        res_d = mini_crossword.apply_action(st, 1, act_d)
+        self.assertIn("SOLVED", res_d["log"][0])
+
+    def test_surrender_elimination_in_three_player_match_and_flag_reset(self):
+        room = Room("HostUser", bingo)
+        p1 = PlayerSession(1, "PlayerOne")
+        p2 = PlayerSession(2, "PlayerTwo")
+        room.players.extend([p1, p2])
+        gm = GameManager(bingo)
+        gm.initialize(room.players)
+
+        # In a 3-player match, if host surrenders:
+        # Match should NOT end, host should be eliminated, remaining players continue
+        is_over = handle_surrender(room, gm, 0)
+        self.assertFalse(is_over, "Host surrender in 3-player match should eliminate host and continue game")
+        self.assertTrue(room.get_player(0).has_surrendered)
+        self.assertFalse(room.get_player(1).has_surrendered)
+        self.assertFalse(room.get_player(2).has_surrendered)
+
+        # Surrender flag must reset on rematch / start of new game
+        for p in room.players:
+            p.has_surrendered = False
+
+        self.assertFalse(room.get_player(0).has_surrendered)
+        self.assertFalse(room.get_player(1).has_surrendered)
+        self.assertFalse(room.get_player(2).has_surrendered)
 
 
 if __name__ == "__main__":
