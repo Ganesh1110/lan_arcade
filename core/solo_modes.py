@@ -1490,31 +1490,13 @@ def _get_best_memory_match_move(state, bot_id=1, bot_memory=None, human_like=Tru
     else:
         c1 = random.choice(available)
 
-    # 3. Pick second card: try to find a known match for c1's symbol in bot_memory
-    sym1 = None
-    if "board" in state and state["board"] and state["board"][c1[0]][c1[1]] is not None:
-        sym1 = state["board"][c1[0]][c1[1]]
-    elif c1 in bot_memory:
-        sym1 = bot_memory[c1]
-
-    matching_in_mem = []
-    if sym1 is not None:
-        matching_in_mem = [
-            coord for coord, sym in bot_memory.items()
-            if sym == sym1 and coord != c1 and coord in available
-        ]
-
-    recall_prob = 0.70 if human_like else 1.0
-    if matching_in_mem and random.random() < recall_prob:
-        c2 = matching_in_mem[0]
+    # 3. Pick second card: prioritize another unknown card if possible, else any other available card
+    other_available = [c for c in available if c != c1]
+    other_unknown = [c for c in other_available if c not in bot_memory]
+    if other_unknown:
+        c2 = random.choice(other_unknown)
     else:
-        # Otherwise pick another unknown card if possible, else any other available card
-        other_available = [c for c in available if c != c1]
-        other_unknown = [c for c in other_available if c not in bot_memory]
-        if other_unknown:
-            c2 = random.choice(other_unknown)
-        else:
-            c2 = random.choice(other_available)
+        c2 = random.choice(other_available)
 
     c1_str = f"{chr(ord('A') + c1[1])}{c1[0] + 1}"
     c2_str = f"{chr(ord('A') + c2[1])}{c2[0] + 1}"

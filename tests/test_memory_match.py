@@ -360,6 +360,62 @@ class TestMemoryMatch(unittest.TestCase):
             self.assertTrue(memory_match.is_over(state), f"Bot game {g_idx} did not finish within 300 moves")
             self.assertEqual(sum(state["scores"].values()), total_pairs)
 
+    def test_bot_move_without_board_key(self):
+        """Verify bot does not require or peek at state['board'] to make a legal move."""
+        players = [{"id": 0, "name": "Human"}, {"id": 1, "name": "MemoryBot"}]
+        state = memory_match.create_state(players)
+        state_no_board = dict(state)
+        del state_no_board["board"]
+
+        bot_mem = {}
+        move = _get_best_memory_match_move(state_no_board, bot_id=1, bot_memory=bot_mem, human_like=True)
+        self.assertIsNotNone(move)
+        c1 = move["card1"]
+        c2 = move["card2"]
+        self.assertNotEqual(c1, c2)
+        self.assertNotIn(c1, state["matched"])
+        self.assertNotIn(c2, state["matched"])
+        self.assertTrue(0 <= c1[0] < state["rows"] and 0 <= c1[1] < state["cols"])
+        self.assertTrue(0 <= c2[0] < state["rows"] and 0 <= c2[1] < state["cols"])
+
+        # Also test with known pair in bot memory without board key
+        bot_mem[(0, 0)] = "🍎"
+        bot_mem[(0, 1)] = "🍎"
+        move_pair = _get_best_memory_match_move(state_no_board, bot_id=1, bot_memory=bot_mem, human_like=True)
+        self.assertIsNotNone(move_pair)
+        pair_coords = {move_pair["card1"], move_pair["card2"]}
+        self.assertEqual(pair_coords, {(0, 0), (0, 1)})
+
+    def test_bot_non_peeking_win_rate_simulation(self):
+        """Simulation asserting bot (human_like=True) does not win more than about 60% of 1,000 games against non-peeking baseline."""
+        bot_wins = 0
+        total_games = 1000
+
+        for g_idx in range(total_games):
+            bot_first = (g_idx % 2 == 1)
+            players = [{"id": 1, "name": "MemoryBot"}, {"id": 0, "name": "Baseline"}] if bot_first else [{"id": 0, "name": "Baseline"}, {"id": 1, "name": "MemoryBot"}]
+            st = memory_match.create_state(players)
+
+            mem_baseline = {}
+            mem_bot = {}
+
+            while not memory_match.is_over(st):
+                pid = memory_match.current_player(st)
+                if pid == 1:
+                    move = _get_best_memory_match_move(st, bot_id=1, bot_memory=mem_bot, human_like=True)
+                else:
+                    move = _get_best_memory_match_move(st, bot_id=0, bot_memory=mem_baseline, human_like=True)
+                memory_match.apply_action(st, pid, move)
+                _update_bot_memory(mem_baseline, st.get("last_reveal"), st["matched"], human_like=True)
+                _update_bot_memory(mem_bot, st.get("last_reveal"), st["matched"], human_like=True)
+
+            winners = memory_match.get_winner(st)
+            if winners == ["MemoryBot"]:
+                bot_wins += 1
+
+        win_pct = (bot_wins / total_games) * 100.0
+        self.assertLessEqual(win_pct, 60.0, f"Bot won {win_pct:.1f}% of games, exceeding 60% threshold!")
+
 
 if __name__ == "__main__":
     unittest.main()

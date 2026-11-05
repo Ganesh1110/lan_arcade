@@ -337,7 +337,10 @@ def play_lan_host(room):
                         print(room.game_module.render_dashboard(host_view))
                     continue
 
-                valid, result_or_err = room.game_module.parse_action(gm.state, 0, raw_in)
+                try:
+                    valid, result_or_err = room.game_module.parse_action(gm.state, 0, raw_in)
+                except Exception as e:
+                    valid, result_or_err = False, f"Invalid action: {e}"
                 if valid:
                     action_data = result_or_err
                     break
@@ -384,7 +387,10 @@ def play_lan_host(room):
                     room.send(pid, {"type": "error", "message": "It is not your turn."})
                     continue
 
-                valid, result_or_err = room.game_module.parse_action(gm.state, current_pid, raw_act)
+                try:
+                    valid, result_or_err = room.game_module.parse_action(gm.state, current_pid, raw_act)
+                except Exception as e:
+                    valid, result_or_err = False, f"Invalid action: {e}"
                 if not valid:
                     room.send(pid, {"type": "error", "message": str(result_or_err)})
                     continue

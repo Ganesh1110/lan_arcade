@@ -52,14 +52,17 @@ def initial_board():
 
 def parse_coord(coord_str):
     """Convert chess notation (e.g. 'e4') to (row, col) (0-7)."""
-    s = coord_str.strip().lower()
+    s = str(coord_str).strip().lower()
     if len(s) != 2:
         return None
     file_char, rank_char = s[0], s[1]
-    if file_char not in FILES or not rank_char.isdigit():
+    if file_char not in FILES or not (rank_char.isascii() and rank_char.isdigit()):
         return None
     col = FILES.index(file_char)
-    rank = int(rank_char)
+    try:
+        rank = int(rank_char)
+    except (ValueError, TypeError, OverflowError):
+        return None
     if not (1 <= rank <= 8):
         return None
     row = 8 - rank
@@ -457,99 +460,102 @@ def prompt_for(state_or_view, player_id):
 
 
 def parse_action(state_or_view, player_id, raw_input):
-    raw = str(raw_input).strip()
-    if not raw:
-        return False, "Move cannot be empty."
+    try:
+        raw = str(raw_input).strip()
+        if not raw:
+            return False, "Move cannot be empty."
 
-    board = state_or_view.get("board") if isinstance(state_or_view, dict) else state_or_view.state["board"]
-    players = state_or_view.get("players", [])
-    p_white = players[0]["id"] if players else 0
-    is_white_turn = (player_id == p_white)
+        board = state_or_view.get("board") if isinstance(state_or_view, dict) else state_or_view.state["board"]
+        players = state_or_view.get("players", [])
+        p_white = players[0]["id"] if players else 0
+        is_white_turn = (player_id == p_white)
 
-    legal_moves = get_legal_moves(board, is_white_turn, state_or_view)
-    if not legal_moves:
-        return False, "No legal moves available."
+        legal_moves = get_legal_moves(board, is_white_turn, state_or_view)
+        if not legal_moves:
+            return False, "No legal moves available."
 
-    candidate = None
-    prom_choice = "Q"
+        candidate = None
+        prom_choice = "Q"
 
-    # 1. Castling shorthand
-    if raw.upper() in {"O-O", "0-0"}:
-        rank = 7 if is_white_turn else 0
-        candidate = {"from": (rank, 4), "to": (rank, 6)}
-    elif raw.upper() in {"O-O-O", "0-0-0"}:
-        rank = 7 if is_white_turn else 0
-        candidate = {"from": (rank, 4), "to": (rank, 2)}
-    else:
-        # Check promotion suffix e.g. e7e8=Q or e7e8q
-        clean_raw = raw.replace(" ", "").replace("-", "").replace("to", "")
-        if "=" in clean_raw:
-            parts = clean_raw.split("=")
-            clean_raw = parts[0]
-            if len(parts) > 1 and parts[1].upper() in {"Q", "R", "B", "N"}:
-                prom_choice = parts[1].upper()
-        elif len(clean_raw) == 5 and clean_raw[4].upper() in {"Q", "R", "B", "N"}:
-            prom_choice = clean_raw[4].upper()
-            clean_raw = clean_raw[:4]
+        # 1. Castling shorthand
+        if raw.upper() in {"O-O", "0-0"}:
+            rank = 7 if is_white_turn else 0
+            candidate = {"from": (rank, 4), "to": (rank, 6)}
+        elif raw.upper() in {"O-O-O", "0-0-0"}:
+            rank = 7 if is_white_turn else 0
+            candidate = {"from": (rank, 4), "to": (rank, 2)}
+        else:
+            # Check promotion suffix e.g. e7e8=Q or e7e8q
+            clean_raw = raw.replace(" ", "").replace("-", "").replace("to", "")
+            if "=" in clean_raw:
+                parts = clean_raw.split("=")
+                clean_raw = parts[0]
+                if len(parts) > 1 and parts[1].upper() in {"Q", "R", "B", "N"}:
+                    prom_choice = parts[1].upper()
+            elif len(clean_raw) == 5 and clean_raw[4].upper() in {"Q", "R", "B", "N"}:
+                prom_choice = clean_raw[4].upper()
+                clean_raw = clean_raw[:4]
 
-        # 2. Coordinate format e.g. 'e2e4'
-        if len(clean_raw) == 4:
-            from_str = clean_raw[:2].lower()
-            to_str = clean_raw[2:4].lower()
-            c1 = parse_coord(from_str)
-            c2 = parse_coord(to_str)
-            if c1 and c2:
-                candidate = {"from": c1, "to": c2}
+            # 2. Coordinate format e.g. 'e2e4'
+            if len(clean_raw) == 4:
+                from_str = clean_raw[:2].lower()
+                to_str = clean_raw[2:4].lower()
+                c1 = parse_coord(from_str)
+                c2 = parse_coord(to_str)
+                if c1 and c2:
+                    candidate = {"from": c1, "to": c2}
 
-        # 3. Standard Algebraic Notation (SAN) e.g. 'Nf3', 'e4', 'Bxf7', 'Qh5', 'exd5'
+            # 3. Standard Algebraic Notation (SAN) e.g. 'Nf3', 'e4', 'Bxf7', 'Qh5', 'exd5'
+            if not candidate:
+                san = raw.replace("+", "").replace("#", "").replace("x", "").replace("X", "").strip()
+                if len(san) >= 2:
+                    target_str = san[-2:].lower()
+                    c2 = parse_coord(target_str)
+                    if c2:
+                        piece_type = san[0].upper() if san[0].isupper() else "P"
+                        disambig = san[1:-2].lower() if san[0].isupper() else san[:-2].lower()
+
+                        matches = []
+                        for m in legal_moves:
+                            if m["to"] == c2:
+                                r1, col1 = m["from"]
+                                p = board[r1][col1]
+                                if p and p.upper() == piece_type:
+                                    # Check disambiguation (file or rank)
+                                    if disambig:
+                                        f_char = FILES[col1]
+                                        r_char = str(8 - r1)
+                                        if disambig not in (f_char, r_char, f"{f_char}{r_char}"):
+                                            continue
+                                    matches.append(m)
+
+                        if len(matches) == 1:
+                            candidate = matches[0]
+                        elif len(matches) > 1:
+                            return False, f"Ambiguous move '{raw}'. Specify starting square (e.g. 'Nbd2')."
+
         if not candidate:
-            san = raw.replace("+", "").replace("#", "").replace("x", "").replace("X", "").strip()
-            if len(san) >= 2:
-                target_str = san[-2:].lower()
-                c2 = parse_coord(target_str)
-                if c2:
-                    piece_type = san[0].upper() if san[0].isupper() else "P"
-                    disambig = san[1:-2].lower() if san[0].isupper() else san[:-2].lower()
+            return False, f"Could not parse chess move '{raw}'. Use e.g. 'e2e4', 'Nf3', or 'O-O'."
 
-                    matches = []
-                    for m in legal_moves:
-                        if m["to"] == c2:
-                            r1, col1 = m["from"]
-                            p = board[r1][col1]
-                            if p and p.upper() == piece_type:
-                                # Check disambiguation (file or rank)
-                                if disambig:
-                                    f_char = FILES[col1]
-                                    r_char = str(8 - r1)
-                                    if disambig not in (f_char, r_char, f"{f_char}{r_char}"):
-                                        continue
-                                matches.append(m)
+        # Verify candidate is strictly legal
+        r1, col1 = candidate["from"]
+        r2, col2 = candidate["to"]
+        is_legal = any(m["from"] == (r1, col1) and m["to"] == (r2, col2) for m in legal_moves)
 
-                    if len(matches) == 1:
-                        candidate = matches[0]
-                    elif len(matches) > 1:
-                        return False, f"Ambiguous move '{raw}'. Specify starting square (e.g. 'Nbd2')."
+        if not is_legal:
+            valid_geom, err = is_valid_piece_move(board, r1, col1, r2, col2, is_white_turn, state_or_view)
+            if not valid_geom:
+                return False, err or "Illegal move."
+            return False, "Illegal move: King would be in CHECK."
 
-    if not candidate:
-        return False, f"Could not parse chess move '{raw}'. Use e.g. 'e2e4', 'Nf3', or 'O-O'."
-
-    # Verify candidate is strictly legal
-    r1, col1 = candidate["from"]
-    r2, col2 = candidate["to"]
-    is_legal = any(m["from"] == (r1, col1) and m["to"] == (r2, col2) for m in legal_moves)
-
-    if not is_legal:
-        valid_geom, err = is_valid_piece_move(board, r1, col1, r2, col2, is_white_turn, state_or_view)
-        if not valid_geom:
-            return False, err or "Illegal move."
-        return False, "Illegal move: King would be in CHECK."
-
-    return True, {
-        "from": (r1, col1),
-        "to": (r2, col2),
-        "promotion": prom_choice,
-        "notation": f"{to_coord(r1, col1)}{to_coord(r2, col2)}"
-    }
+        return True, {
+            "from": (r1, col1),
+            "to": (r2, col2),
+            "promotion": prom_choice,
+            "notation": f"{to_coord(r1, col1)}{to_coord(r2, col2)}"
+        }
+    except Exception as e:
+        return False, f"Invalid move: {e}"
 
 
 def apply_action(state, player_id, action_data):

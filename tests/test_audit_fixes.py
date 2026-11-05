@@ -359,6 +359,93 @@ class TestAuditFixes(unittest.TestCase):
         # Client exceeded MAX_LINE_LENGTH and was immediately dropped
         self.assertEqual(len(room.players), 1)
 
+    def test_all_games_registry_hostile_strings_no_raise(self):
+        """Every game in GAMES_REGISTRY must not raise on a list of hostile strings."""
+        from games import GAMES_REGISTRY
+
+        hostile_inputs = [
+            "A² B1",
+            "²",
+            "³",
+            "٣",
+            "\x00",
+            "A" * 10000,
+            "😀🔥🚀💎🎉",
+            "A²",
+            "B٣",
+            "1²",
+            "0\x001",
+            "",
+            "   ",
+            "\n\t\r",
+            "E⁴",
+            "NULL",
+            "NaN",
+            "undefined"
+        ]
+
+        for gid, g in GAMES_REGISTRY.items():
+            sessions = [{"id": 0, "name": "Host"}, {"id": 1, "name": "Guest"}]
+            state = g.create_state(sessions)
+            curr_pid = g.current_player(state)
+            view0 = g.view_for(state, curr_pid)
+
+            for h in hostile_inputs:
+                try:
+                    ok_st, res_st = g.parse_action(state, curr_pid, h)
+                    self.assertIsInstance(ok_st, bool, f"Game {gid} on state with input {repr(h)} returned non-bool {ok_st}")
+                except Exception as e:
+                    self.fail(f"Game '{gid}' crashed on state with hostile input {repr(h)}: {type(e).__name__}: {e}")
+
+                try:
+                    ok_v, res_v = g.parse_action(view0, curr_pid, h)
+                    self.assertIsInstance(ok_v, bool, f"Game {gid} on view with input {repr(h)} returned non-bool {ok_v}")
+                except Exception as e:
+                    self.fail(f"Game '{gid}' crashed on view with hostile input {repr(h)}: {type(e).__name__}: {e}")
+
+    def test_real_socket_guest_hostile_input_host_loop_alive(self):
+        """Real-socket test: guest sends 'A² B1' and the host loop stays alive."""
+        import socket
+        import threading
+        import time
+        from unittest.mock import patch
+        from protocol import encode_message, decode_message
+        from games import tic_tac_toe
+
+        room = Room("Host", tic_tac_toe)
+        c_sock, s_sock = socket.socketpair()
+        t_handler = threading.Thread(target=room.client_handler, args=(s_sock,), daemon=True)
+        t_handler.start()
+
+        # Connect guest
+        c_sock.sendall(encode_message({"type": "join", "name": "Guest"}))
+        time.sleep(0.05)
+
+        # Host inputs: cell 1 on turn 1, then option 3 on rematch menu to exit cleanly
+        host_inputs = iter(["1", "3"])
+        def mock_input(prompt):
+            return next(host_inputs)
+
+        t_host = threading.Thread(target=play_lan_host, args=(room,), daemon=True)
+        with patch("builtins.input", mock_input), patch("core.server.clear_screen"):
+            t_host.start()
+            time.sleep(0.15)
+
+            # Guest sends hostile string "A² B1" over real socket
+            c_sock.sendall(encode_message({"type": "action", "action": "A² B1"}))
+            time.sleep(0.15)
+
+            # Assert host loop is still running (did not crash or exit)
+            self.assertTrue(t_host.is_alive(), "Host loop crashed on guest hostile input!")
+
+            # Guest gracefully forfeits to allow clean termination
+            c_sock.sendall(encode_message({"type": "surrender"}))
+            t_host.join(timeout=2.0)
+            self.assertFalse(t_host.is_alive(), "Host thread did not finish cleanly after match end")
+
+        c_sock.close()
+        s_sock.close()
+
 
 if __name__ == "__main__":
     unittest.main()

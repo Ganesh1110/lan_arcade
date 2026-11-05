@@ -82,15 +82,19 @@ def _parse_single_coord(token, rows, cols):
         return None, f"Invalid coordinate format '{token}'. Use column letter and row number (e.g. A1)."
 
     c_char, r_char = t[0], t[1]
-    # Allow row first or col first e.g. '1A' as well as 'A1'
-    if t[0].isdigit() and t[1].isalpha():
+    # Allow row first or col first e.g. '1A' as well as 'A1' (strictly ASCII)
+    if (t[0].isascii() and t[0].isdigit()) and (t[1].isascii() and t[1].isalpha()):
         r_char, c_char = t[0], t[1]
 
-    if not (c_char.isalpha() and r_char.isdigit()):
+    if not ((c_char.isascii() and c_char.isalpha()) and (r_char.isascii() and r_char.isdigit())):
         return None, f"Invalid card coordinate '{token}'. Expected a column letter and row number (e.g. A1)."
 
-    col = ord(c_char) - ord('A')
-    row = int(r_char) - 1
+    try:
+        col = ord(c_char) - ord('A')
+        row = int(r_char) - 1
+    except (ValueError, TypeError, OverflowError):
+        return None, f"Invalid card coordinate '{token}'."
+
     max_col_char = chr(ord('A') + cols - 1)
 
     if not (0 <= row < rows and 0 <= col < cols):
@@ -105,62 +109,65 @@ def parse_action(state_or_view, player_id, raw_input):
     Accepts: 'A1 C3', 'A1,C3', 'a1 c3', 'A1, C3'.
     Returns: (ok, action_or_error_str)
     """
-    # 1. Turn check
-    curr_turn = state_or_view.get("turn_id")
-    if curr_turn is None and "players" in state_or_view and "turn_index" in state_or_view:
-        curr_turn = current_player(state_or_view)
+    try:
+        # 1. Turn check
+        curr_turn = state_or_view.get("turn_id")
+        if curr_turn is None and "players" in state_or_view and "turn_index" in state_or_view:
+            curr_turn = current_player(state_or_view)
 
-    if curr_turn is not None and curr_turn != player_id:
-        return False, "It is not your turn."
+        if curr_turn is not None and curr_turn != player_id:
+            return False, "It is not your turn."
 
-    if raw_input is None:
-        return False, "Please enter two card coordinates (e.g. A1 C3)."
+        if raw_input is None:
+            return False, "Please enter two card coordinates (e.g. A1 C3)."
 
-    # 2. Token extraction
-    raw = str(raw_input).strip().replace(",", " ")
-    tokens = raw.split()
-    if len(tokens) != 2:
-        return False, "Please choose exactly two cards (e.g. 'A1 C3')."
+        # 2. Token extraction
+        raw = str(raw_input).strip().replace(",", " ")
+        tokens = raw.split()
+        if len(tokens) != 2:
+            return False, "Please choose exactly two cards (e.g. 'A1 C3')."
 
-    rows = state_or_view.get("rows", 4)
-    cols = state_or_view.get("cols", 4)
+        rows = state_or_view.get("rows", 4)
+        cols = state_or_view.get("cols", 4)
 
-    # 3. Parse coordinates
-    c1, err1 = _parse_single_coord(tokens[0], rows, cols)
-    if err1:
-        return False, err1
+        # 3. Parse coordinates
+        c1, err1 = _parse_single_coord(tokens[0], rows, cols)
+        if err1:
+            return False, err1
 
-    c2, err2 = _parse_single_coord(tokens[1], rows, cols)
-    if err2:
-        return False, err2
+        c2, err2 = _parse_single_coord(tokens[1], rows, cols)
+        if err2:
+            return False, err2
 
-    # 4. Same card twice
-    if c1 == c2:
-        return False, "You must choose two different cards."
+        # 4. Same card twice
+        if c1 == c2:
+            return False, "You must choose two different cards."
 
-    # 5. Already matched check
-    matched = state_or_view.get("matched", set())
-    if isinstance(matched, list):
-        # Could be list of [r, c] pairs from view
-        matched_set = {(item[0], item[1]) for item in matched}
-    else:
-        matched_set = matched
+        # 5. Already matched check
+        matched = state_or_view.get("matched", set())
+        if isinstance(matched, list):
+            # Could be list of [r, c] pairs from view
+            matched_set = {(item[0], item[1]) for item in matched}
+        else:
+            matched_set = matched
 
-    if c1 in matched_set:
-        return False, f"Card {tokens[0].upper()} has already been matched!"
+        if c1 in matched_set:
+            return False, f"Card {tokens[0].upper()} has already been matched!"
 
-    if c2 in matched_set:
-        return False, f"Card {tokens[1].upper()} has already been matched!"
+        if c2 in matched_set:
+            return False, f"Card {tokens[1].upper()} has already been matched!"
 
-    c1_str = f"{chr(ord('A') + c1[1])}{c1[0] + 1}"
-    c2_str = f"{chr(ord('A') + c2[1])}{c2[0] + 1}"
+        c1_str = f"{chr(ord('A') + c1[1])}{c1[0] + 1}"
+        c2_str = f"{chr(ord('A') + c2[1])}{c2[0] + 1}"
 
-    return True, {
-        "card1": c1,
-        "card2": c2,
-        "c1_str": c1_str,
-        "c2_str": c2_str
-    }
+        return True, {
+            "card1": c1,
+            "card2": c2,
+            "c1_str": c1_str,
+            "c2_str": c2_str
+        }
+    except Exception as e:
+        return False, f"Invalid card coordinates: {e}"
 
 
 def apply_action(state, player_id, action):

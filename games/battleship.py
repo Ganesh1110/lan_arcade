@@ -104,31 +104,38 @@ def prompt_for(state_or_view, player_id):
 
 
 def parse_action(state_or_view, player_id, raw_input):
-    coord = parse_coordinate(raw_input, GRID_SIZE, GRID_SIZE)
-    if coord is None:
-        return False, f"Invalid coordinate '{raw_input}'. Enter A1–E5."
+    try:
+        coord = parse_coordinate(raw_input, GRID_SIZE, GRID_SIZE)
+        if coord is None:
+            return False, f"Invalid coordinate '{raw_input}'. Enter A1–E5."
 
-    r, c = coord
+        r, c = coord
 
-    if "shots" in state_or_view and isinstance(state_or_view["shots"], dict):
-        shot_tuples = set(state_or_view["shots"].get(player_id, {}).keys())
-    elif "my_shots" in state_or_view:
-        my_shots = state_or_view.get("my_shots", {})
-        if isinstance(my_shots, dict):
-            shot_tuples = {
-                (int(k.split(",")[0]), int(k.split(",")[1])) if isinstance(k, str) else k
-                for k in my_shots.keys()
-            }
+        if "shots" in state_or_view and isinstance(state_or_view["shots"], dict):
+            shot_tuples = set(state_or_view["shots"].get(player_id, {}).keys())
+        elif "my_shots" in state_or_view:
+            my_shots = state_or_view.get("my_shots", {})
+            if isinstance(my_shots, dict):
+                shot_tuples = set()
+                for k in my_shots.keys():
+                    if isinstance(k, str) and "," in k:
+                        parts = k.split(",")
+                        if len(parts) == 2 and parts[0].isascii() and parts[0].isdigit() and parts[1].isascii() and parts[1].isdigit():
+                            shot_tuples.add((int(parts[0]), int(parts[1])))
+                    elif isinstance(k, (tuple, list)) and len(k) == 2:
+                        shot_tuples.add(tuple(k))
+            else:
+                shot_tuples = set()
         else:
             shot_tuples = set()
-    else:
-        shot_tuples = set()
 
-    if (r, c) in shot_tuples:
-        col_char = chr(ord('A') + c)
-        return False, f"You already attacked {col_char}{r + 1}! Choose another coordinate."
+        if (r, c) in shot_tuples:
+            col_char = chr(ord('A') + c)
+            return False, f"You already attacked {col_char}{r + 1}! Choose another coordinate."
 
-    return True, (r, c)
+        return True, (r, c)
+    except Exception as e:
+        return False, f"Invalid coordinate: {e}"
 
 
 def apply_action(state, player_id, coord):

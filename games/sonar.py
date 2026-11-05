@@ -19,10 +19,13 @@ def parse_coord(coord_str):
     if len(s) != 2:
         return None
     f, r = s[0], s[1]
-    if f not in FILES or not r.isdigit():
+    if f not in FILES or not (r.isascii() and r.isdigit()):
         return None
     c = FILES.index(f)
-    row = int(r) - 1
+    try:
+        row = int(r) - 1
+    except (ValueError, TypeError, OverflowError):
+        return None
     if 0 <= row < GRID_SIZE:
         return (row, c)
     return None
@@ -123,62 +126,65 @@ def prompt_for(state_or_view, player_id):
 
 
 def parse_action(state_or_view, player_id, raw_input):
-    parts = str(raw_input).strip().upper().split()
-    if not parts:
-        return False, "Enter command: 'MOVE <N/S/E/W>', 'SONAR <A-H or 1-8>', 'TORPEDO <Coord>' or 'SILENT'."
+    try:
+        parts = str(raw_input).strip().upper().split()
+        if not parts:
+            return False, "Enter command: 'MOVE <N/S/E/W>', 'SONAR <A-H or 1-8>', 'TORPEDO <Coord>' or 'SILENT'."
 
-    cmd = parts[0]
+        cmd = parts[0]
 
-    # 1. MOVE
-    if cmd in {"MOVE", "M"}:
-        if len(parts) < 2:
-            return False, "Specify direction: 'MOVE N', 'MOVE S', 'MOVE E', or 'MOVE W'."
-        d = parts[1][0]
-        if d in {"N", "S", "E", "W"}:
-            return True, {"action": "move", "dir": d}
-        return False, f"Unknown direction '{d}'. Use N, S, E, or W."
+        # 1. MOVE
+        if cmd in {"MOVE", "M"}:
+            if len(parts) < 2:
+                return False, "Specify direction: 'MOVE N', 'MOVE S', 'MOVE E', or 'MOVE W'."
+            d = parts[1][0]
+            if d in {"N", "S", "E", "W"}:
+                return True, {"action": "move", "dir": d}
+            return False, f"Unknown direction '{d}'. Use N, S, E, or W."
 
-    # Direct direction shorthand
-    if cmd in {"N", "S", "E", "W"}:
-        return True, {"action": "move", "dir": cmd}
+        # Direct direction shorthand
+        if cmd in {"N", "S", "E", "W"}:
+            return True, {"action": "move", "dir": cmd}
 
-    # 2. SONAR
-    if cmd in {"SONAR", "PING", "P"}:
-        rem_pings = state_or_view.get("pings", {}).get(player_id, state_or_view.get("my_pings", 3))
-        if rem_pings <= 0:
-            return False, "No sonar pings remaining! Acoustic pings depleted (0 left)."
-        if len(parts) < 2:
-            return False, "Specify column (A–H) or row (1–8) for sonar ping (e.g. 'SONAR E' or 'SONAR 4')."
-        target = parts[1]
-        if target in FILES or (target.isdigit() and 1 <= int(target) <= 8):
-            return True, {"action": "sonar", "target": target}
-        return False, f"Invalid sonar target '{target}'. Must be Column (A–H) or Row (1–8)."
+        # 2. SONAR
+        if cmd in {"SONAR", "PING", "P"}:
+            rem_pings = state_or_view.get("pings", {}).get(player_id, state_or_view.get("my_pings", 3))
+            if rem_pings <= 0:
+                return False, "No sonar pings remaining! Acoustic pings depleted (0 left)."
+            if len(parts) < 2:
+                return False, "Specify column (A–H) or row (1–8) for sonar ping (e.g. 'SONAR E' or 'SONAR 4')."
+            target = parts[1]
+            if target in FILES or ((target.isascii() and target.isdigit()) and 1 <= int(target) <= 8):
+                return True, {"action": "sonar", "target": target}
+            return False, f"Invalid sonar target '{target}'. Must be Column (A–H) or Row (1–8)."
 
-    # 3. TORPEDO
-    if cmd in {"TORPEDO", "FIRE", "SHOOT", "T"}:
-        rem_torps = state_or_view.get("torpedoes", {}).get(player_id, state_or_view.get("my_torpedoes", 4))
-        if rem_torps <= 0:
-            return False, "No torpedoes remaining! Munitions depleted (0 left)."
-        if len(parts) < 2:
-            return False, "Specify coordinate for torpedo launch (e.g. 'TORPEDO E4')."
-        coord = parse_coord(parts[1])
-        if not coord:
-            return False, f"Invalid coordinate '{parts[1]}' (e.g. 'E4')."
-        return True, {"action": "torpedo", "coord": coord, "text": parts[1]}
+        # 3. TORPEDO
+        if cmd in {"TORPEDO", "FIRE", "SHOOT", "T"}:
+            rem_torps = state_or_view.get("torpedoes", {}).get(player_id, state_or_view.get("my_torpedoes", 4))
+            if rem_torps <= 0:
+                return False, "No torpedoes remaining! Munitions depleted (0 left)."
+            if len(parts) < 2:
+                return False, "Specify coordinate for torpedo launch (e.g. 'TORPEDO E4')."
+            coord = parse_coord(parts[1])
+            if not coord:
+                return False, f"Invalid coordinate '{parts[1]}' (e.g. 'E4')."
+            return True, {"action": "torpedo", "coord": coord, "text": parts[1]}
 
-    # Direct coordinate shorthand e.g. "E4"
-    coord = parse_coord(cmd)
-    if coord:
-        rem_torps = state_or_view.get("torpedoes", {}).get(player_id, state_or_view.get("my_torpedoes", 4))
-        if rem_torps <= 0:
-            return False, "No torpedoes remaining! Munitions depleted (0 left)."
-        return True, {"action": "torpedo", "coord": coord, "text": cmd}
+        # Direct coordinate shorthand e.g. "E4"
+        coord = parse_coord(cmd)
+        if coord:
+            rem_torps = state_or_view.get("torpedoes", {}).get(player_id, state_or_view.get("my_torpedoes", 4))
+            if rem_torps <= 0:
+                return False, "No torpedoes remaining! Munitions depleted (0 left)."
+            return True, {"action": "torpedo", "coord": coord, "text": cmd}
 
-    # 4. SILENT RUNNING
-    if cmd in {"SILENT", "WAIT", "PASS"}:
-        return True, {"action": "silent"}
+        # 4. SILENT RUNNING
+        if cmd in {"SILENT", "WAIT", "PASS"}:
+            return True, {"action": "silent"}
 
-    return False, f"Unknown command '{cmd}'. Try 'MOVE N', 'SONAR E', 'TORPEDO E4', or 'SILENT'."
+        return False, f"Unknown command '{cmd}'. Try 'MOVE N', 'SONAR E', 'TORPEDO E4', or 'SILENT'."
+    except Exception as e:
+        return False, f"Invalid sonar command: {e}"
 
 
 def apply_action(state, player_id, action_data):

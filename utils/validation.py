@@ -34,11 +34,15 @@ def parse_coordinate(raw, rows=5, cols=5):
     col_char = text[0]
     row_text = text[1:]
 
-    if not col_char.isalpha() or not row_text.isdigit():
+    # Strictly ASCII letter and ASCII digit
+    if not (col_char.isascii() and col_char.isalpha()) or not (row_text.isascii() and row_text.isdigit()):
         return None
 
-    col = ord(col_char) - ord('A')
-    row = int(row_text) - 1
+    try:
+        col = ord(col_char) - ord('A')
+        row = int(row_text) - 1
+    except (ValueError, TypeError, OverflowError):
+        return None
 
     if 0 <= row < rows and 0 <= col < cols:
         return (row, col)
