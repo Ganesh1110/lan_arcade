@@ -85,32 +85,139 @@ def handle_surrender(room, gm, surr_pid):
         "players": room.players_payload()
     })
 
+    return handle_post_match_rematch(room, gm, msg, winners)
+
+
+def _start_rematch(room):
+    """Start rematch after verifying active players and resetting per-match state."""
+    with room.lock:
+        room.players = [p for p in room.players if p.player_id == 0 or p.is_online]
+        player_count = len(room.players)
+
+    min_req = getattr(room.game_module, "min_players", 2)
+    if player_count < min_req:
+        msg = f"⚠️ Not enough players remaining for {room.game_module.game_name} ({player_count}/{min_req}). Returning to lobby."
+        print(paint(f"\n  {msg}", "1;31"))
+        room.started = False
+        room.rematch_votes.clear()
+        room.broadcast({
+            "type": "end",
+            "message": msg,
+            "players": room.players_payload()
+        })
+        return False
+
+    room.match_count = getattr(room, "match_count", 0) + 1
+    room.started = True
+    room.rematch_votes.clear()
+    for p in room.players:
+        p.has_surrendered = False
+    room.drain_moves()
+    while not room.surrender_queue.empty():
+        try:
+            room.surrender_queue.get_nowait()
+        except Exception:
+            break
+    room.log.clear()
+
+    room.broadcast({"type": "rematch", "message": "Host initiated a rematch!"})
+    time.sleep(0.8)
+    play_lan_host(room)
+    return True
+
+
+def handle_post_match_rematch(room, gm, msg, winners):
+    """Unified post-match handler displaying final view, rematch votes, and host options."""
     clear_screen()
     final_host_view = gm.get_view_for(0)
     print(room.game_module.render_final(final_host_view, msg, winners))
 
-    print("\n" + paint("=" * 48, "1;36"))
-    print("  1. Rematch (Play Again with same players)")
-    print("  2. Return to Main Menu")
-    print(paint("=" * 48, "1;36"))
+    with room.lock:
+        active_guests = [p for p in room.players if p.player_id != 0 and p.is_online]
+        room.players = [p for p in room.players if p.player_id == 0 or p.is_online]
 
-    choice = input("\nSelect option [1]: ").strip()
-    if choice == "2":
-        room.closed = True
-        room.started = False
-        room.broadcast({"type": "host_exit", "message": "Host returned to main menu."})
-    else:
-        room.broadcast({"type": "rematch", "message": "Host initiated a rematch!"})
+    # Auto-start if all connected guests have already voted
+    if active_guests and all(p.player_id in room.rematch_votes for p in active_guests):
+        print(paint("\n  🎉 All connected players voted for a rematch! Auto-starting...", "1;32"))
         time.sleep(0.8)
-        play_lan_host(room)
-    return True
+        return _start_rematch(room)
+
+    while True:
+        with room.lock:
+            active_guests = [p for p in room.players if p.player_id != 0 and p.is_online]
+            room.players = [p for p in room.players if p.player_id == 0 or p.is_online]
+
+        print("\n" + paint("=" * 52, "1;36"))
+        print(paint("  POST-MATCH LOBBY — REMATCH STATUS", "1;36"))
+        print(paint("=" * 52, "1;36"))
+        print("  • Host (You) [Ready]")
+        for p in active_guests:
+            voted = p.player_id in room.rematch_votes
+            status = paint("VOTED FOR REMATCH ✅", "1;32") if voted else paint("Waiting for vote... ⏳", "1;33")
+            print(f"  • {p.name}: {status}")
+
+        print(paint("─" * 52, "1;36"))
+        print("  1. Rematch (Start now with connected players)")
+        print("  2. Wait for votes (Auto-starts when all vote)")
+        print("  3. Return to Main Menu")
+        print(paint("=" * 52, "1;36"))
+
+        choice = input("\nSelect option [1]: ").strip().upper()
+
+        if choice in {"3", "Q", "QUIT", "EXIT", "2"}:
+            room.closed = True
+            room.started = False
+            room.broadcast({"type": "host_exit", "message": "Host returned to main menu."})
+            return True
+        elif choice in {"WAIT"}:
+            print("\n  ⏳ Waiting for connected players to vote (timeout in 30s)...")
+            start_wait = time.time()
+            all_voted = False
+            while time.time() - start_wait < 30.0:
+                with room.lock:
+                    active_guests = [p for p in room.players if p.player_id != 0 and p.is_online]
+                    room.players = [p for p in room.players if p.player_id == 0 or p.is_online]
+                if active_guests and all(p.player_id in room.rematch_votes for p in active_guests):
+                    all_voted = True
+                    break
+                time.sleep(0.5)
+
+            if all_voted:
+                print(paint("  🎉 All players have voted! Starting rematch...", "1;32"))
+                time.sleep(0.8)
+                return _start_rematch(room)
+            else:
+                print("  Timeout or not all players voted yet.")
+                continue
+        else:
+            return _start_rematch(room)
 
 
 def play_lan_host(room):
     """Host authoritative main game loop."""
     room.started = True
+    with room.lock:
+        room.players = [p for p in room.players if p.player_id == 0 or p.is_online]
+
+    min_req = getattr(room.game_module, "min_players", 2)
+    if len(room.players) < min_req:
+        msg = f"⚠️ Not enough players remaining for {room.game_module.game_name} ({len(room.players)}/{min_req}). Returning to lobby."
+        print(paint(f"\n  {msg}", "1;31"))
+        room.started = False
+        room.broadcast({
+            "type": "end",
+            "message": msg,
+            "players": room.players_payload()
+        })
+        return
+
+    # Alternate starting player on rematch
+    match_idx = getattr(room, "match_count", 0)
+    start_offset = match_idx % len(room.players)
+    ordered_players = room.players[start_offset:] + room.players[:start_offset]
+
     gm = GameManager(room.game_module)
-    gm.initialize(room.players)
+    gm.initialize(ordered_players)
 
     # Reset surrender flag for all players at the start of each game/rematch
     for p in room.players:
@@ -343,25 +450,7 @@ def play_lan_host(room):
         "players": room.players_payload()
     })
 
-    clear_screen()
-    final_host_view = gm.get_view_for(0)
-    print(room.game_module.render_final(final_host_view, msg, winners))
-
-    print("\n" + paint("=" * 48, "1;36"))
-    print("  1. Rematch (Play Again with same players)")
-    print("  2. Return to Main Menu")
-    print(paint("=" * 48, "1;36"))
-
-    choice = input("\nSelect option [1]: ").strip()
-    if choice == "2":
-        room.closed = True
-        room.started = False
-        room.broadcast({"type": "host_exit", "message": "Host returned to main menu."})
-        return
-    else:
-        room.broadcast({"type": "rematch", "message": "Host initiated a rematch!"})
-        time.sleep(0.8)
-        play_lan_host(room)
+    return handle_post_match_rematch(room, gm, msg, winners)
 
 
 def render_host_lobby(room, host_ip, port):

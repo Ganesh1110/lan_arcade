@@ -62,7 +62,34 @@ The arcade menu launches instantly in their terminal with zero repo downloading 
   20. **Chess** (2 Players) - Full 8x8 standard chess with checkmate, castling, en passant, and promotion.
   21. **Arrow Man Duel** (2 Players) - Turn-based bowman archery duel with dynamic wind, special quivers, and randomized tower elevations.
 - **In-Game Forfeit / Surrender & Live Chat**: Any player can type `!ff` / `!surrender` / `!giveup` / `!quit` at any time to forfeit a match, or `! <message>` to chat with room players.
+- **Instant Rematch / Play Again Flow**: End-of-match instant rematches across all 21 games with no name re-entry or menu navigation (`R`/`Enter` to Rematch, `M` for Solo Menu, `Q` for Main Menu).
 - **Zero External Dependencies**: Runs entirely on Python 3.9+ standard library.
+
+---
+
+## 🔄 Instant Rematch & Post-Match Controls
+
+College LAN Arcade features a seamless zero-friction Rematch flow across **all 21 games** in both Solo and LAN Multiplayer modes:
+
+### Solo & Offline Practice Modes
+When any solo match finishes:
+- **`[Enter]` or `R`**: **Rematch** — Immediately starts a new match with the same player name and a fresh, randomized board/state (target word in Wordle, question sets in Quiz, wind/terrain in Artillery & Arrow Man, etc.).
+  - Alternates the starting player turn on each rematch (and swaps White/Black colors in Chess).
+  - Displays a running session score (e.g. `Session: You 2 - 1 Bot`).
+- **`M`**: **Solo Menu** — Return to the solo game selection menu.
+- **`Q`**: **Main Menu** — Exit directly to the College LAN Arcade main menu.
+- Mid-match **`q`**: Exits immediately without prompting for a rematch.
+
+### LAN Multiplayer
+When a multiplayer match concludes:
+- **Guests / Clients**: Press **`[R]`** to vote for a rematch or **`[Q]`** to leave the lobby.
+- **Host**: Views live rematch votes from all connected peers:
+  - **`1` / `[Enter]`**: Start rematch immediately with all currently connected players.
+  - **`2`**: Wait for votes (auto-starts the rematch once all connected guests have voted).
+  - **`3`**: Return to main menu and close the room.
+- Alternates starting player turn each round across the connected player roster.
+- All per-match state (surrender status, move queues, event logs) is cleanly reset while preserving player connections and names.
+- If players depart leaving fewer than `min_players`, the match safely returns remaining players to the lobby.
 
 ---
 

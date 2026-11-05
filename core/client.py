@@ -89,9 +89,7 @@ class ClientSession:
             else:
                 print(paint(f"\n  {msg_text}", "1;33"))
             print(paint("\n  ════════════════════════════════════════════════════════════", "1;36"))
-            print(paint("  ⏳ Match Complete! Waiting for host (Rematch / Main Menu)...", "1;33"))
-            print(paint("  • If host chooses Rematch, the next round starts automatically!", "2"))
-            print(paint("  • Press 'Q' to leave and return to the main menu.", "2"))
+            print(paint("  [R] Rematch (Vote to play again)    [Q] Leave lobby", "1;32"))
             print(paint("  ════════════════════════════════════════════════════════════", "1;36"))
 
     def send(self, payload):
@@ -264,14 +262,21 @@ class ClientSession:
                 if self.turn_event.wait(0.15):
                     self.ask_move()
                 elif self.match_ended:
-                    # Match finished; wait for host to trigger rematch, or allow client to press Q to quit
+                    # Match finished; vote for rematch with R, or press Q to leave
                     key = read_direct_key(timeout=0.2)
                     if key is not None:
                         key_str = str(key).strip().upper()
-                        if key_str in {"Q", "!FF", "QUIT", "EXIT"}:
+                        if key_str in {"R", "REMATCH"}:
+                            try:
+                                self.send({"type": "rematch_vote"})
+                                with self.screen_lock:
+                                    print(paint("  🗳️ Rematch vote sent! Waiting for other players...", "1;32"))
+                            except OSError:
+                                pass
+                        elif key_str in {"Q", "!FF", "QUIT", "EXIT"}:
                             self.over.set()
                             try:
-                                self.send({"type": "surrender"})
+                                self.send({"type": "leave"})
                             except OSError:
                                 pass
                             break

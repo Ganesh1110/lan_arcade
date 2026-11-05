@@ -332,8 +332,10 @@ def pc_pick(pc, players, called):
     return best
 
 
-def run_local_game(players):
-    called, history, turn = set(), [], 0
+def run_local_game(players, start_turn=0):
+    from utils.stats import record_match_outcome
+    called, history = set(), []
+    turn = start_turn
     humans = sum(p.human for p in players)
     while len(called) < 25:
         index = turn % len(players)
@@ -353,8 +355,8 @@ def run_local_game(players):
             print(render_dashboard(v))
             while True:
                 raw = input("\nCall a number (1-25) or Q to quit: ").strip()
-                if raw.lower() in {"q", "quit"}:
-                    return
+                if raw.lower() in {"q", "quit", "exit"}:
+                    return None
                 valid, res = parse_action({"called": called}, index, raw)
                 if valid:
                     number = res
@@ -375,35 +377,22 @@ def run_local_game(players):
         winners = [p for p in players if len(p.letters) >= 5]
         if winners:
             print(paint("\n🏆 " + " AND ".join(p.name for p in winners) + " WINS BINGO! 🏆", "1;32"))
-            break
+            record_match_outcome("Bingo (vs PC)", [p.name for p in players], [w.name for w in winners])
+            if any(w.human for w in winners):
+                return "player"
+            return "bot"
 
         nxt = players[(turn + 1) % len(players)]
         if humans > 1 and nxt.human:
             input(f"\nPass keyboard to {nxt.name} and press Enter...")
         else:
-            input("\nPress Enter for next turn...")
+            time.sleep(0.4)
         turn += 1
+
+    record_match_outcome("Bingo (vs PC)", [p.name for p in players], [])
+    return "draw"
 
 
 def solo_setup():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("          BINGO — SOLO VS PC", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = input("Enter your name [You]: ").strip() or "You"
-    players = [LocalPlayer(name, human=True)]
-
-    while True:
-        try:
-            cnt = int(input("How many PC opponents? (1–3): ").strip())
-            if 1 <= cnt <= 3:
-                break
-        except ValueError:
-            pass
-        print("Please enter 1, 2, or 3.")
-
-    for pc_name in ["PC Nova", "PC Pixel", "PC Turbo"][:cnt]:
-        players.append(LocalPlayer(pc_name, human=False))
-
-    input("\nBoards ready! Press Enter to start...")
-    run_local_game(players)
+    from core.solo_modes import run_bingo_vs_ai
+    return run_bingo_vs_ai()

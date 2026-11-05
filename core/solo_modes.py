@@ -19,15 +19,65 @@ from utils.validation import clean_name
 
 
 # ==========================================
-# 1. SOLO 2048 ENDLESS CHASE
+# SHARED REMATCH HELPER
 # ==========================================
-def run_solo_2048():
+def run_with_rematch(play_fn, title, default_name="Player"):
+    """
+    Shared wrapper for solo games that manages:
+    - Asking for the player's name ONCE per session
+    - Session score tracking (Human vs Bot/Draws)
+    - Rematch loop with [Enter]/R (Rematch), M (Solo Menu), Q (Main Menu)
+    - Clean exit if the game is quit mid-match with 'q'
+    """
     clear_screen()
     print(paint("=" * 50, "1;36"))
-    print(paint("         2048 — SOLO HIGH-SCORE CHASE", "1;36"))
+    print(paint(f"        {title.upper()}", "1;36"))
     print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
+    name = clean_name(input(f"\nEnter your player name [{default_name}]: "), default_name)
 
+    rematch_count = 0
+    scores = {"player": 0, "bot": 0, "draw": 0}
+
+    while True:
+        outcome = play_fn(name, rematch_count)
+        if outcome is None:
+            # User quit mid-game with 'q'
+            return "solo_menu"
+
+        if outcome == "player":
+            scores["player"] += 1
+        elif outcome == "bot":
+            scores["bot"] += 1
+        elif outcome == "draw":
+            scores["draw"] += 1
+
+        print("\n" + paint("─" * 50, "1;36"))
+        score_line = f"  📊 Session: You {paint(scores['player'], '1;32')} - {paint(scores['bot'], '1;31')} Bot"
+        if scores["draw"] > 0:
+            score_line += f" ({scores['draw']} Draws)"
+        print(score_line)
+        print(paint("─" * 50, "1;36"))
+        print(paint("  [Enter] / R  -> Rematch (Play Again immediately)", "1;32"))
+        print(paint("  M            -> Back to Solo Menu", "1;33"))
+        print(paint("  Q            -> Quit to Main Menu", "1;35"))
+        print(paint("─" * 50, "1;36"))
+
+        choice = input("\nSelect option [Rematch]: ").strip().upper()
+        if choice in {"", "R", "REMATCH", "1"}:
+            rematch_count += 1
+            continue
+        elif choice in {"M", "MENU", "SOLO", "2"}:
+            return "solo_menu"
+        elif choice in {"Q", "QUIT", "EXIT", "3"}:
+            return "main_menu"
+        else:
+            return "solo_menu"
+
+
+# ==========================================
+# 1. SOLO 2048 ENDLESS CHASE
+# ==========================================
+def _play_2048(name, rematch_count=0):
     grid = game2048.create_initial_grid()
     score = 0
     moves = 0
@@ -59,8 +109,7 @@ def run_solo_2048():
             print(paint("\n  💀 GAME OVER! No legal moves remaining.", "1;31"))
             print(f"  Final Score: {paint(score, '1;32')} | Highest Tile: {paint(max_t, '1;33')}")
             record_high_score("game2048", name, score, f"Tile: {max_t}")
-            input("\nPress Enter to return to solo menu...")
-            break
+            return "player"
 
         if log:
             print("\n  " + log[-1])
@@ -70,7 +119,7 @@ def run_solo_2048():
             record_high_score("game2048", name, score, f"Tile: {max_t}")
             print(paint(f"\n  Progress saved! Final Score: {score}", "1;32"))
             time.sleep(1.0)
-            break
+            return None
 
         if raw_in not in {"W", "A", "S", "D"}:
             log.append("Invalid direction. Use W, A, S, or D.")
@@ -90,6 +139,10 @@ def run_solo_2048():
             log.append(f"No tiles moved in direction {raw_in}.")
 
 
+def run_solo_2048():
+    return run_with_rematch(_play_2048, "2048 — Solo High-Score Chase", "Player")
+
+
 # ==========================================
 # 2. CONNECT FOUR VS SMART BOT
 # ==========================================
@@ -99,37 +152,32 @@ def _get_best_c4_col(board, bot_sym, player_sym):
         if board[0][c] is None:
             r = max(row for row in range(connect4.ROWS) if board[row][c] is None)
             board[r][c] = bot_sym
-            won, _ = connect4.check_win(board, r, c, bot_sym)
-            board[r][c] = None
-            if won:
+            if connect4.check_win(board, r, c, bot_sym):
+                board[r][c] = None
                 return c
+            board[r][c] = None
 
-    # 2. Block Player's winning move
+    # 2. Blocking move for Player
     for c in range(connect4.COLS):
         if board[0][c] is None:
             r = max(row for row in range(connect4.ROWS) if board[row][c] is None)
             board[r][c] = player_sym
-            won, _ = connect4.check_win(board, r, c, player_sym)
-            board[r][c] = None
-            if won:
+            if connect4.check_win(board, r, c, player_sym):
+                board[r][c] = None
                 return c
+            board[r][c] = None
 
-    # 3. Prefer center columns
-    preferred = [3, 2, 4, 1, 5, 0, 6]
-    for c in preferred:
+    # 3. Center column preference
+    order = [3, 2, 4, 1, 5, 0, 6]
+    for c in order:
         if board[0][c] is None:
             return c
     return 0
 
 
-def run_connect4_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("        CONNECT FOUR — VS ARCADE BOT", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
-
-    sessions = [{"id": 0, "name": name}, {"id": 1, "name": "ArcadeBot 🤖"}]
+def _play_connect4(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "ArcadeBot 🤖"}, {"id": 0, "name": name}] if bot_first else [{"id": 0, "name": name}, {"id": 1, "name": "ArcadeBot 🤖"}]
     state = connect4.create_state(sessions)
 
     while not connect4.is_over(state):
@@ -144,7 +192,7 @@ def run_connect4_vs_ai():
             while True:
                 raw = input(f"\n  ▶ YOUR TURN ({name}) — Choose column (1–7) or 'q' to quit: ").strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, col_idx = connect4.parse_action(state, 0, raw)
                 if valid:
                     events = connect4.apply_action(state, 0, col_idx)
@@ -155,7 +203,9 @@ def run_connect4_vs_ai():
             print("\n  🤖 ArcadeBot is calculating next move...")
             time.sleep(0.8)
             board = state["board"]
-            bot_col = _get_best_c4_col(board, "O", "X")
+            bot_sym = state["symbols"][1]
+            player_sym = state["symbols"][0]
+            bot_col = _get_best_c4_col(board, bot_sym, player_sym)
             events = connect4.apply_action(state, 1, bot_col)
             state["log"] = events.get("log", [])
 
@@ -166,7 +216,15 @@ def run_connect4_vs_ai():
     print(connect4.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Connect Four (vs Bot)", [name, "ArcadeBot 🤖"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_connect4_vs_ai():
+    return run_with_rematch(_play_connect4, "Connect Four — vs Arcade Bot", "Player")
 
 
 # ==========================================
@@ -210,14 +268,9 @@ def _get_best_ttt_cell(board, bot_sym, player_sym):
     return 0
 
 
-def run_tic_tac_toe_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("        TIC-TAC-TOE — VS ARCADE BOT", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
-
-    sessions = [{"id": 0, "name": name}, {"id": 1, "name": "ArcadeBot 🤖"}]
+def _play_tic_tac_toe(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "ArcadeBot 🤖"}, {"id": 0, "name": name}] if bot_first else [{"id": 0, "name": name}, {"id": 1, "name": "ArcadeBot 🤖"}]
     state = tic_tac_toe.create_state(sessions)
 
     while not tic_tac_toe.is_over(state):
@@ -232,7 +285,7 @@ def run_tic_tac_toe_vs_ai():
             while True:
                 raw = input(f"\n  ▶ YOUR TURN ({name}) — Choose position (1–9) or 'q' to quit: ").strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, cell_idx = tic_tac_toe.parse_action(state, 0, raw)
                 if valid:
                     events = tic_tac_toe.apply_action(state, 0, cell_idx)
@@ -242,7 +295,9 @@ def run_tic_tac_toe_vs_ai():
         else:
             print("\n  🤖 ArcadeBot is making a move...")
             time.sleep(0.6)
-            bot_cell = _get_best_ttt_cell(state["board"], "O", "X")
+            bot_sym = state["symbols"][1]
+            player_sym = state["symbols"][0]
+            bot_cell = _get_best_ttt_cell(state["board"], bot_sym, player_sym)
             events = tic_tac_toe.apply_action(state, 1, bot_cell)
             state["log"] = events.get("log", [])
 
@@ -253,20 +308,23 @@ def run_tic_tac_toe_vs_ai():
     print(tic_tac_toe.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Tic-Tac-Toe (vs Bot)", [name, "ArcadeBot 🤖"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_tic_tac_toe_vs_ai():
+    return run_with_rematch(_play_tic_tac_toe, "Tic-Tac-Toe — vs Arcade Bot", "Player")
 
 
 # ==========================================
 # 4. BATTLESHIP VS NAVAL AI
 # ==========================================
-def run_battleship_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("        BATTLESHIP — VS NAVAL AI", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Captain]: "), "Captain")
-
-    sessions = [{"id": 0, "name": name}, {"id": 1, "name": "Naval AI ⚓"}]
+def _play_battleship(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "Naval AI ⚓"}, {"id": 0, "name": name}] if bot_first else [{"id": 0, "name": name}, {"id": 1, "name": "Naval AI ⚓"}]
     state = battleship.create_state(sessions)
     bot_targets_tried = set()
 
@@ -282,7 +340,7 @@ def run_battleship_vs_ai():
             while True:
                 raw = input(f"\n  ▶ YOUR RADAR TURN ({name}) — Target (e.g. C3, A1) or 'q' to quit: ").strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, coord = battleship.parse_action(v, 0, raw)
                 if valid:
                     events = battleship.apply_action(state, 0, coord)
@@ -292,7 +350,6 @@ def run_battleship_vs_ai():
         else:
             print("\n  ⚓ Naval AI is calibrating torpedo trajectory...")
             time.sleep(0.8)
-            # Pick random untargeted cell
             available = [(r, c) for r in range(5) for c in range(5) if (r, c) not in bot_targets_tried]
             bot_coord = random.choice(available)
             bot_targets_tried.add(bot_coord)
@@ -306,33 +363,25 @@ def run_battleship_vs_ai():
     print(battleship.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Battleship (vs AI)", [name, "Naval AI ⚓"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_battleship_vs_ai():
+    return run_with_rematch(_play_battleship, "Battleship — vs Naval AI", "Captain")
 
 
 # ==========================================
 # 5. SNAKE & LADDERS VS BOTS
 # ==========================================
-def run_snake_and_ladder_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("     SNAKE & LADDERS — VS COMPUTER BOTS", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
-
-    bot_cnt = 1
-    try:
-        raw_cnt = input("How many bot opponents? (1–3) [1]: ").strip()
-        if raw_cnt in {"1", "2", "3"}:
-            bot_cnt = int(raw_cnt)
-    except Exception:
-        pass
-
-    bot_names = ["Bot Nova 🤖", "Bot Pixel 👾", "Bot Turbo ⚡"]
-    sessions = [{"id": 0, "name": name}]
-    for i in range(bot_cnt):
-        sessions.append({"id": i + 1, "name": bot_names[i]})
-
-    state = snake_and_ladder.create_state(sessions)
+def _play_snake_and_ladder(name, rematch_count=0):
+    sessions = [{"id": 0, "name": name}, {"id": 1, "name": "Bot Nova 🤖"}]
+    turn_offset = rematch_count % len(sessions)
+    ordered = sessions[turn_offset:] + sessions[:turn_offset]
+    state = snake_and_ladder.create_state(ordered)
 
     while not snake_and_ladder.is_over(state):
         curr_id = snake_and_ladder.current_player(state)
@@ -346,7 +395,7 @@ def run_snake_and_ladder_vs_ai():
             play_sound("turn")
             raw = input(f"\n  ▶ YOUR TURN ({name}) — Press [ENTER] to roll die (or 'q' to quit): ").strip()
             if raw.lower() in {"q", "quit", "exit"}:
-                return
+                return None
             snake_and_ladder.apply_action(state, 0, "roll")
         else:
             print(f"\n  🎲 {curr_p['name']} is shaking the dice cup...")
@@ -360,20 +409,21 @@ def run_snake_and_ladder_vs_ai():
     print(snake_and_ladder.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Snake & Ladders (vs Bots)", [p["name"] for p in state["players"]], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    return "bot"
+
+
+def run_snake_and_ladder_vs_ai():
+    return run_with_rematch(_play_snake_and_ladder, "Snake & Ladders — vs Computer Bots", "Player")
 
 
 # ==========================================
 # 6. WORD CHAIN (SHIRITORI) VS LEXICON BOT
 # ==========================================
-def run_shiritori_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("     WORD CHAIN — VS LEXICON BOT", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
-
-    sessions = [{"id": 0, "name": name}, {"id": 1, "name": "LexiconBot 📚"}]
+def _play_shiritori(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "LexiconBot 📚"}, {"id": 0, "name": name}] if bot_first else [{"id": 0, "name": name}, {"id": 1, "name": "LexiconBot 📚"}]
     state = shiritori.create_state(sessions)
     words_pool = list(get_words_set())
 
@@ -390,7 +440,7 @@ def run_shiritori_vs_ai():
                 prompt = f"\n  ▶ YOUR TURN ({name}) — Word starting with '{req}' (or 'pass', 'q' to quit): " if req else f"\n  ▶ YOUR TURN ({name}) — Enter starting word (or 'q' to quit): "
                 raw = input(prompt).strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, word = shiritori.parse_action(state, 0, raw)
                 if valid:
                     shiritori.apply_action(state, 0, word)
@@ -419,7 +469,15 @@ def run_shiritori_vs_ai():
     print(shiritori.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Word Chain (vs Bot)", [name, "LexiconBot 📚"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_shiritori_vs_ai():
+    return run_with_rematch(_play_shiritori, "Word Chain — vs Lexicon Bot", "Player")
 
 
 # ==========================================
@@ -494,14 +552,10 @@ def _get_best_wordle_guess(state, bot_id=1, human_like=False):
     return random.choice(candidates)
 
 
-def run_solo_wordle():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("           SOLO WORDLE CHALLENGE", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
-
-    state = wordle.create_state([{"id": 0, "name": name}, {"id": 1, "name": "WordleBot 🤖"}])
+def _play_wordle(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "WordleBot 🤖"}, {"id": 0, "name": name}] if bot_first else [{"id": 0, "name": name}, {"id": 1, "name": "WordleBot 🤖"}]
+    state = wordle.create_state(sessions)
 
     while not wordle.is_over(state):
         curr_id = wordle.current_player(state)
@@ -514,7 +568,7 @@ def run_solo_wordle():
             while True:
                 raw = input("\n  ▶ YOUR TURN — Enter 5-letter word (or 'q' to quit): ").strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, word = wordle.parse_action(state, 0, raw)
                 if valid:
                     wordle.apply_action(state, 0, word)
@@ -550,20 +604,24 @@ def run_solo_wordle():
         msg = f"💀 Out of attempts! The secret word was '{target}'."
     print(wordle.render_final(v, msg, winners))
     record_match_outcome("Wordle (vs Bot)", [name, "WordleBot 🤖"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if state["solved"].get(0, False):
+        return "player"
+    elif state["solved"].get(1, False):
+        return "bot"
+    return "draw"
+
+
+def run_solo_wordle():
+    return run_with_rematch(_play_wordle, "Solo Wordle Challenge", "Player")
 
 
 # ==========================================
 # 8. SOLO TRIVIA QUIZ CHALLENGE
 # ==========================================
-def run_solo_quiz_show():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("         SOLO COLLEGE TRIVIA QUIZ", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
-
-    state = quiz_show.create_state([{"id": 0, "name": name}, {"id": 1, "name": "QuizBot 🤖"}])
+def _play_quiz_show(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "QuizBot 🤖"}, {"id": 0, "name": name}] if bot_first else [{"id": 0, "name": name}, {"id": 1, "name": "QuizBot 🤖"}]
+    state = quiz_show.create_state(sessions)
 
     while not quiz_show.is_over(state):
         curr_id = quiz_show.current_player(state)
@@ -576,7 +634,7 @@ def run_solo_quiz_show():
             while True:
                 raw = input("\n  ▶ YOUR TURN — Answer (A, B, C, D or 'q' to quit): ").strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, choice = quiz_show.parse_action(state, 0, raw)
                 if valid:
                     quiz_show.apply_action(state, 0, choice)
@@ -597,7 +655,6 @@ def run_solo_quiz_show():
                 "🌍 Science": 0.45,
             }
             base_acc = cat_accuracy.get(cat, 0.52)
-            # Pressure / streak regulation: human error increases if on a hot streak
             bot_streak = state["streaks"].get(1, 0)
             if bot_streak >= 1:
                 base_acc = max(0.35, base_acc - 0.12 * bot_streak)
@@ -609,13 +666,12 @@ def run_solo_quiz_show():
                 "🤖 QuizBot is debating between two plausible choices..."
             ]
             print(f"\n  {random.choice(deliberations)}")
-            time.sleep(random.uniform(1.0, 1.4))
+            time.sleep(random.uniform(0.6, 1.0))
 
             correct_ans = curr_q["answer"]
             if random.random() < base_acc:
                 bot_choice = correct_ans
             else:
-                # Human-like mistake: pick a believable wrong answer among the remaining
                 wrong_choices = [c for c in ["A", "B", "C", "D"] if c != correct_ans]
                 bot_choice = random.choice(wrong_choices)
             quiz_show.apply_action(state, 1, bot_choice)
@@ -630,7 +686,15 @@ def run_solo_quiz_show():
     play_sound("win")
     record_high_score("quiz_show", name, my_sc, f"{my_sc} pts")
     record_match_outcome("Quiz Show (vs Bot)", [name, "QuizBot 🤖"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_solo_quiz_show():
+    return run_with_rematch(_play_quiz_show, "Solo College Trivia Quiz", "Player")
 
 
 # ==========================================
@@ -646,6 +710,7 @@ TYPO_MAP = {
     'O': 'P', 'P': 'O', 'Q': 'W', 'R': 'T', 'S': 'D', 'T': 'Y', 'U': 'I',
     'V': 'B', 'W': 'E', 'X': 'C', 'Y': 'U', 'Z': 'X'
 }
+
 
 def _make_human_typing_attempt(snip):
     """
@@ -679,14 +744,10 @@ def _make_human_typing_attempt(snip):
         return res, "🏎️ SpeedyBot fumbled a word and had to backspace (+5% stumble)!"
 
 
-def run_solo_typing_racer():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("       TYPING RACER VS SPEEDY BOT 🏎️", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Player]: "), "Player")
-
-    state = typing_racer.create_state([{"id": 0, "name": name}, {"id": 1, "name": "SpeedyBot 🏎️"}])
+def _play_typing_racer(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "SpeedyBot 🏎️"}, {"id": 0, "name": name}] if bot_first else [{"id": 0, "name": name}, {"id": 1, "name": "SpeedyBot 🏎️"}]
+    state = typing_racer.create_state(sessions)
 
     while not typing_racer.is_over(state):
         curr_id = typing_racer.current_player(state)
@@ -698,13 +759,13 @@ def run_solo_typing_racer():
             play_sound("turn")
             raw = input("\n  ▶ Type snippet above (or 'q' to quit): ").strip()
             if raw.lower() in {"q", "quit", "exit"}:
-                return
+                return None
             typing_racer.apply_action(state, 0, raw)
         else:
             snip = typing_racer.get_current_snippet(state)
             bot_typed, msg = _make_human_typing_attempt(snip)
             print(f"\n  {msg}")
-            time.sleep(random.uniform(1.1, 1.4))
+            time.sleep(random.uniform(0.7, 1.1))
             typing_racer.apply_action(state, 1, bot_typed)
 
     clear_screen()
@@ -714,7 +775,15 @@ def run_solo_typing_racer():
     print(typing_racer.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Typing Racer (vs Bot)", [name, "SpeedyBot 🏎️"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_solo_typing_racer():
+    return run_with_rematch(_play_typing_racer, "Typing Racer vs Speedy Bot 🏎️", "Player")
 
 
 # ==========================================
@@ -746,26 +815,21 @@ def _get_best_artillery_shot(terrain, bot_x, target_x, wind, shot_num=1, human_l
         return {"angle": jitter_ang, "power": jitter_pow}
 
     # Human Gunner Phased Ballistics:
-    # Humans never have a built-in trajectory solver; they shoot, observe crater, and adjust.
-    # Shot 1: Sighting / ranging shot (offset by ~12-16 tiles, 0 dmg).
     if shot_num == 1:
         p_offset = random.choice([-16.0, -14.0, 14.0])
         a_offset = random.uniform(-5.0, 5.0)
         h_ang = round(best_shot[0] + a_offset, 1)
         h_pow = round(best_shot[1] + p_offset, 1)
-    # Shot 2: Bracketing shot (offset by ~5-8 tiles, at most splash 25 dmg, never direct kill).
     elif shot_num == 2:
         p_offset = random.choice([-8.0, -6.0, 7.0])
         a_offset = random.uniform(-3.0, 3.0)
         h_ang = round(best_shot[0] + a_offset, 1)
         h_pow = round(best_shot[1] + p_offset, 1)
-    # Shot 3: Fine-tuning elevation & wind deflection (~2-4 tiles offset).
     elif shot_num == 3:
         p_offset = random.choice([-4.0, -2.0, 3.0])
         a_offset = random.uniform(-2.0, 2.0)
         h_ang = round(best_shot[0] + a_offset, 1)
         h_pow = round(best_shot[1] + p_offset, 1)
-    # Shot 4+: Dialed-in effect fire (near miss or direct hit).
     else:
         h_ang = round(best_shot[0] + random.uniform(-1.5, 1.5), 1)
         h_pow = round(best_shot[1] + random.uniform(-2.0, 2.0), 1)
@@ -775,14 +839,11 @@ def _get_best_artillery_shot(terrain, bot_x, target_x, wind, shot_num=1, human_l
     return {"angle": h_ang, "power": h_pow}
 
 
-def run_artillery_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("       ARTILLERY DUEL VS BALLISTICS AI 🎯", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Gunner]: "), "Gunner")
-
+def _play_artillery(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
     state = artillery.create_state([{"id": 0, "name": name}, {"id": 1, "name": "Ballistics AI 🎯"}])
+    if bot_first:
+        state["turn_index"] = 1
     bot_shot_count = 0
 
     while not artillery.is_over(state):
@@ -796,7 +857,7 @@ def run_artillery_vs_ai():
             while True:
                 raw = input("\n  ▶ Enter Angle (0–180°) and Power (1–100) (e.g. '45 60' or 'q' to quit): ").strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, shot_data = artillery.parse_action(state, 0, raw)
                 if valid:
                     artillery.apply_action(state, 0, shot_data)
@@ -827,7 +888,15 @@ def run_artillery_vs_ai():
     print(artillery.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Artillery Duel (vs AI)", [name, "Ballistics AI 🎯"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_artillery_vs_ai():
+    return run_with_rematch(_play_artillery, "Artillery Duel vs Ballistics AI 🎯", "Gunner")
 
 
 # ==========================================
@@ -898,12 +967,11 @@ def _get_best_snake_duel_move(state, bot_id=1, human_like=False):
             first_cmd = target_path[0]
             if first_cmd in candidates:
                 nxt_x, nxt_y, _, _ = candidates[first_cmd]
-                # Follow the path to the apple if it leaves sufficient room to escape (no suicide coils)
                 my_len = len(state["trails"].get(bot_id, []))
                 if count_open_space((nxt_x, nxt_y)) >= min(6, my_len + 1):
                     return first_cmd
 
-    # 3. Fallback: Score candidate moves combining open space, fruit attraction, and forward momentum
+    # 3. Fallback: Score candidate moves
     scored = []
     for cmd, (nx, ny, ndx, ndy) in candidates.items():
         space = count_open_space((nx, ny))
@@ -911,10 +979,8 @@ def _get_best_snake_duel_move(state, bot_id=1, human_like=False):
 
         if pellet:
             dist = abs(nx - pellet[0]) + abs(ny - pellet[1])
-            # Consistent global attraction to apple across the entire arena
             score += max(0, 50 - dist * 2.5)
 
-        # Slight forward momentum preference when open
         if (ndx, ndy) == (dx, dy):
             score += 2.0
 
@@ -927,14 +993,11 @@ def _get_best_snake_duel_move(state, bot_id=1, human_like=False):
     return scored[0][1]
 
 
-def run_snake_duel_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("         SNAKE DUEL VS TRON BOT ⚡", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Rider]: "), "Rider")
-
+def _play_snake_duel(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
     state = snake_duel.create_state([{"id": 0, "name": name}, {"id": 1, "name": "TronBot ⚡"}])
+    if bot_first:
+        state["turn_index"] = 1
 
     while not snake_duel.is_over(state):
         curr_id = snake_duel.current_player(state)
@@ -946,8 +1009,8 @@ def run_snake_duel_vs_ai():
             play_sound("turn")
             print(paint("\n  ▶ Steer: Arrow Keys or W/A/S/D (direct keypress, 'q' to quit):", "1;33"), end="", flush=True)
             cmd = read_direct_key()
-            if cmd is None or cmd.lower() in {"q", "!ff"}:
-                return
+            if cmd is None or str(cmd).lower() in {"q", "!ff"}:
+                return None
             valid, act = snake_duel.parse_action(state, 0, cmd)
             if valid:
                 snake_duel.apply_action(state, 0, act)
@@ -976,13 +1039,27 @@ def run_snake_duel_vs_ai():
 
     print(snake_duel.render_final(v, msg, winners))
     record_match_outcome("Snake Duel (vs Bot)", [name, "TronBot ⚡"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and winners[0] == name:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_snake_duel_vs_ai():
+    return run_with_rematch(_play_snake_duel, "Snake Duel vs Tron Bot ⚡", "Rider")
 
 
 # ==========================================
 # 12. CHESS VS CHESS BOT
 # ==========================================
-# Standard human opening responses for Black (Rank 8 is row 0, Rank 7 is row 1)
+WHITE_OPENING_BOOK = [
+    ((6, 4), (4, 4)),  # 1. e4
+    ((6, 3), (4, 3)),  # 1. d4
+    ((7, 6), (5, 5)),  # 1. Nf3
+    ((6, 2), (4, 2)),  # 1. c4
+]
+
 BLACK_OPENING_BOOK = {
     # After White 1. e4
     "e2e4": [
@@ -997,28 +1074,28 @@ BLACK_OPENING_BOOK = {
     ],
     # After 1. e4 e5 2. Nf3
     "e2e4_e7e5_g1f3": [
-        ((0, 1), (2, 2)),  # 2... Nc6 (classic defense of e5)
-        ((0, 6), (2, 5)),  # 2... Nf6 (Petrov defense)
+        ((0, 1), (2, 2)),  # 2... Nc6
+        ((0, 6), (2, 5)),  # 2... Nf6
     ],
     # After 1. e4 e5 2. Bc4
     "e2e4_e7e5_f1c4": [
         ((0, 6), (2, 5)),  # 2... Nf6
         ((0, 1), (2, 2)),  # 2... Nc6
     ],
-    # After 1. e4 e5 2. Qh5 (Wayward Queen attack)
+    # After 1. e4 e5 2. Qh5
     "e2e4_e7e5_d1h5": [
-        ((0, 1), (2, 2)),  # 2... Nc6 (defend e5!)
+        ((0, 1), (2, 2)),  # 2... Nc6
     ],
-    # After 1. d4 d5 2. c4 (Queen's Gambit)
+    # After 1. d4 d5 2. c4
     "d2d4_d7d5_c2c4": [
-        ((1, 4), (2, 4)),  # 2... e6 (QGD)
-        ((1, 2), (2, 2)),  # 2... c6 (Slav)
+        ((1, 4), (2, 4)),  # 2... e6
+        ((1, 2), (2, 2)),  # 2... c6
     ]
 }
 
 
-def _get_best_chess_move(board, moves_history=None, human_like=False):
-    legal_moves_dicts = chess_game.get_legal_moves(board, False)
+def _get_best_chess_move(board, moves_history=None, human_like=False, is_white=False):
+    legal_moves_dicts = chess_game.get_legal_moves(board, is_white)
     legal_moves = [(m["from"], m["to"]) for m in legal_moves_dicts]
     if not legal_moves:
         return None
@@ -1047,8 +1124,14 @@ def _get_best_chess_move(board, moves_history=None, human_like=False):
         return {"from": (r1, c1), "to": (r2, c2), "notation": f"{from_str}{to_str}"}
 
     # Human-like Chess Playing:
-    # 1. Opening Book matching
-    if moves_history:
+    if is_white and (not moves_history):
+        white_choices = [mv for mv in WHITE_OPENING_BOOK if mv in legal_moves]
+        if white_choices:
+            choice = random.choice(white_choices)
+            (r1, c1), (r2, c2) = choice
+            return {"from": (r1, c1), "to": (r2, c2), "notation": f"{chess_game.to_coord(r1, c1)}{chess_game.to_coord(r2, c2)}"}
+
+    if (not is_white) and moves_history:
         clean_moves = []
         for mh in moves_history:
             parts = mh.split("➔")
@@ -1065,46 +1148,53 @@ def _get_best_chess_move(board, moves_history=None, human_like=False):
                 (r1, c1), (r2, c2) = choice
                 return {"from": (r1, c1), "to": (r2, c2), "notation": f"{chess_game.to_coord(r1, c1)}{chess_game.to_coord(r2, c2)}"}
 
-    # 2. Human Heuristic Evaluation (Piece development, center, king safety, defended pieces)
+    # Human Heuristic Evaluation
     scored = []
     for (r1, c1), (r2, c2) in legal_moves:
         p = board[r1][c1]
         target = board[r2][c2]
         score = 0.0
 
-        # Material gain
         if target is not None:
             score += piece_vals.get(target, 1) * 10.0
 
-        # Center control (d5, e5, d4, e4)
         if 2 <= r2 <= 5 and 2 <= c2 <= 5:
             score += 1.5
 
-        # Minor piece development (knights and bishops off back rank)
-        if p in {"n", "b"} and r1 == 0 and r2 > 0:
-            score += 3.0
+        if is_white:
+            if p in {"N", "B"} and r1 == 7 and r2 < 7:
+                score += 3.0
+            if p == "K" and r1 == 7 and r2 != 7:
+                score -= 4.0
+            if p == "Q" and target is None and len(moves_history or []) < 6:
+                score -= 2.0
+        else:
+            if p in {"n", "b"} and r1 == 0 and r2 > 0:
+                score += 3.0
+            if p == "k" and r1 == 0 and r2 != 0:
+                score -= 4.0
+            if p == "q" and target is None and len(moves_history or []) < 6:
+                score -= 2.0
 
-        # King safety: avoid moving King out into the open early
-        if p == "k" and r1 == 0 and r2 != 0:
-            score -= 4.0
-
-        # Don't move Queen too early without good target
-        if p == "q" and target is None and len(moves_history or []) < 6:
-            score -= 2.0
-
-        # Guarded square penalty (avoid moving valuable piece into a square attacked by White)
         tb = copy.deepcopy(board)
         tb[r2][c2] = tb[r1][c1]
         tb[r1][c1] = None
+
         is_attacked = False
-        for wr in range(8):
-            for wc in range(8):
-                wp = tb[wr][wc]
-                if wp and chess_game.is_white_piece(wp):
-                    v, _ = chess_game.is_valid_piece_move(tb, wr, wc, r2, c2, True)
-                    if v:
-                        is_attacked = True
-                        break
+        for opp_r in range(8):
+            for opp_c in range(8):
+                opp_p = tb[opp_r][opp_c]
+                if opp_p:
+                    if is_white and (not chess_game.is_white_piece(opp_p)):
+                        v, _ = chess_game.is_valid_piece_move(tb, opp_r, opp_c, r2, c2, False)
+                        if v:
+                            is_attacked = True
+                            break
+                    elif (not is_white) and chess_game.is_white_piece(opp_p):
+                        v, _ = chess_game.is_valid_piece_move(tb, opp_r, opp_c, r2, c2, True)
+                        if v:
+                            is_attacked = True
+                            break
             if is_attacked:
                 break
 
@@ -1115,8 +1205,12 @@ def _get_best_chess_move(board, moves_history=None, human_like=False):
                 score -= (my_val - target_val) * 7.0
 
         # Check bonus
-        if chess_game.is_king_in_check(tb, True):
-            score += 3.5
+        if is_white:
+            if chess_game.is_king_in_check(tb, False):
+                score += 3.5
+        else:
+            if chess_game.is_king_in_check(tb, True):
+                score += 3.5
 
         score += random.uniform(-0.5, 0.5)
         scored.append((score, ((r1, c1), (r2, c2))))
@@ -1131,14 +1225,11 @@ def _get_best_chess_move(board, moves_history=None, human_like=False):
     return {"from": (r1, c1), "to": (r2, c2), "notation": f"{from_str}{to_str}"}
 
 
-def run_chess_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("           CHESS VS CHESS BOT ♟️", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Grandmaster]: "), "Grandmaster")
-
-    state = chess_game.create_state([{"id": 0, "name": name}, {"id": 1, "name": "ChessBot ♟️"}])
+def _play_chess(name, rematch_count=0):
+    bot_is_white = (rematch_count % 2 == 1)
+    sessions = [{"id": 1, "name": "ChessBot ♟️"}, {"id": 0, "name": name}] if bot_is_white else [{"id": 0, "name": name}, {"id": 1, "name": "ChessBot ♟️"}]
+    state = chess_game.create_state(sessions)
+    human_side = "Black" if bot_is_white else "White"
 
     while not chess_game.is_over(state):
         curr_id = chess_game.current_player(state)
@@ -1149,9 +1240,9 @@ def run_chess_vs_ai():
         if curr_id == 0:
             play_sound("turn")
             while True:
-                raw = input("\n  ▶ YOUR TURN (White) — Move (e.g. 'e2e4' or 'e2 e4', 'q' to quit): ").strip()
+                raw = input(f"\n  ▶ YOUR TURN ({human_side}) — Move (e.g. 'e2e4' or 'e7e5', 'q' to quit): ").strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, move_data = chess_game.parse_action(state, 0, raw)
                 if valid:
                     chess_game.apply_action(state, 0, move_data)
@@ -1164,12 +1255,11 @@ def run_chess_vs_ai():
             else:
                 print("\n  ♟️ ChessBot is evaluating tactical positioning and piece safety...")
             time.sleep(1.0)
-            bot_move = _get_best_chess_move(state["board"], state.get("moves_history", []), human_like=True)
+            bot_move = _get_best_chess_move(state["board"], state.get("moves_history", []), human_like=True, is_white=bot_is_white)
             if bot_move:
                 chess_game.apply_action(state, 1, bot_move)
             else:
-                # Checkmate or Stalemate when bot has no legal moves
-                if chess_game.is_king_in_check(state["board"], False):
+                if chess_game.is_king_in_check(state["board"], bot_is_white):
                     state["winner"] = [name]
                 else:
                     state["winner"] = []
@@ -1188,11 +1278,19 @@ def run_chess_vs_ai():
     print(chess_game.render_final(v, msg, winners))
     play_sound("win")
     record_match_outcome("Chess (vs Bot)", [name, "ChessBot ♟️"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and name in winners:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
+
+
+def run_chess_vs_ai():
+    return run_with_rematch(_play_chess, "Chess vs Chess Bot ♟️", "Grandmaster")
 
 
 # ==========================================
-# 14. ARROW MAN DUEL VS ROBIN BOT
+# 13. ARROW MAN DUEL VS ROBIN BOT
 # ==========================================
 def _get_best_arrow_man_shot(state, bot_id=1, shot_num=1, human_like=True):
     p1_x = state["positions"][state["players"][0]["id"]]
@@ -1256,14 +1354,11 @@ def _get_best_arrow_man_shot(state, bot_id=1, shot_num=1, human_like=True):
     return {"angle": final_ang, "power": final_pow, "arrow": arrow_choice}
 
 
-def run_arrow_man_vs_ai():
-    clear_screen()
-    print(paint("=" * 50, "1;36"))
-    print(paint("       ARROW MAN DUEL VS ROBIN BOT 🏹", "1;36"))
-    print(paint("=" * 50, "1;36"))
-    name = clean_name(input("\nEnter your player name [Archer]: "), "Archer")
-
+def _play_arrow_man(name, rematch_count=0):
+    bot_first = (rematch_count % 2 == 1)
     state = arrow_man.create_state([{"id": 0, "name": name}, {"id": 1, "name": "RobinBot 🏹"}])
+    if bot_first:
+        state["turn_index"] = 1
     bot_shot_count = 0
     last_round = 1
 
@@ -1283,7 +1378,7 @@ def run_arrow_man_vs_ai():
             while True:
                 raw = input("\n  ▶ Enter Angle & Power (e.g. '45 70' or '50 75 fire', 'q' to quit): ").strip()
                 if raw.lower() in {"q", "quit", "exit"}:
-                    return
+                    return None
                 valid, action_data = arrow_man.parse_action(state, 0, raw)
                 if valid:
                     arrow_man.apply_action(state, 0, action_data)
@@ -1319,6 +1414,26 @@ def run_arrow_man_vs_ai():
 
     print(arrow_man.render_final(v, msg, winners))
     record_match_outcome("Arrow Man Duel (vs AI)", [name, "RobinBot 🏹"], winners)
-    input("\nPress Enter to return to solo menu...")
+    if winners and winners[0] == name:
+        return "player"
+    elif winners:
+        return "bot"
+    return "draw"
 
 
+def run_arrow_man_vs_ai():
+    return run_with_rematch(_play_arrow_man, "Arrow Man Duel vs Robin Bot 🏹", "Archer")
+
+
+# ==========================================
+# 14. BINGO VS PC BOT
+# ==========================================
+def _play_bingo(name, rematch_count=0):
+    from games.bingo import LocalPlayer, run_local_game
+    players = [LocalPlayer(name, human=True), LocalPlayer("PC Nova", human=False)]
+    start_turn = rematch_count % len(players)
+    return run_local_game(players, start_turn=start_turn)
+
+
+def run_bingo_vs_ai():
+    return run_with_rematch(_play_bingo, "Bingo — vs Computer Bot", "Player")

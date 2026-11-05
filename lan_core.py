@@ -26,7 +26,8 @@ from core.solo_modes import (
     run_artillery_vs_ai,
     run_snake_duel_vs_ai,
     run_chess_vs_ai,
-    run_arrow_man_vs_ai
+    run_arrow_man_vs_ai,
+    run_bingo_vs_ai
 )
 from utils.stats import render_hall_of_fame
 from games import (
@@ -162,39 +163,44 @@ def solo_menu():
         print(render_menu("SOLO & OFFLINE ARCADE", options))
         choice = input("Select solo game: ").strip()
 
+        res = None
         if choice == "1":
-            bingo.solo_setup()
+            res = bingo.solo_setup()
         elif choice == "2":
-            run_solo_2048()
+            res = run_solo_2048()
         elif choice == "3":
-            run_connect4_vs_ai()
+            res = run_connect4_vs_ai()
         elif choice == "4":
-            run_battleship_vs_ai()
+            res = run_battleship_vs_ai()
         elif choice == "5":
-            run_tic_tac_toe_vs_ai()
+            res = run_tic_tac_toe_vs_ai()
         elif choice == "6":
-            run_snake_and_ladder_vs_ai()
+            res = run_snake_and_ladder_vs_ai()
         elif choice == "7":
-            run_shiritori_vs_ai()
+            res = run_shiritori_vs_ai()
         elif choice == "8":
-            run_solo_wordle()
+            res = run_solo_wordle()
         elif choice == "9":
-            run_solo_quiz_show()
+            res = run_solo_quiz_show()
         elif choice == "10":
-            run_solo_typing_racer()
+            res = run_solo_typing_racer()
         elif choice == "11":
-            run_artillery_vs_ai()
+            res = run_artillery_vs_ai()
         elif choice == "12":
-            run_snake_duel_vs_ai()
+            res = run_snake_duel_vs_ai()
         elif choice == "13":
-            run_chess_vs_ai()
+            res = run_chess_vs_ai()
         elif choice == "14":
-            run_arrow_man_vs_ai()
+            res = run_arrow_man_vs_ai()
         elif choice == "15" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
             print("Please enter 1–15.")
             input("Press Enter to continue...")
+            continue
+
+        if res == "main_menu":
+            break
 
 
 def main():

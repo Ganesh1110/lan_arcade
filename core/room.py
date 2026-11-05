@@ -37,6 +37,8 @@ class Room:
         self.started = False
         self.closed = False
         self.ended = False
+        self.rematch_votes = set()
+        self.match_count = 0
         self.log = deque(maxlen=6)
 
     def get_player(self, pid):
@@ -85,6 +87,7 @@ class Room:
         with self.lock:
             self.connections.pop(pid, None)
             self.send_locks.pop(pid, None)
+            self.rematch_votes.discard(pid)
             player = self.get_player(pid)
             if player is not None:
                 player.is_online = False
@@ -142,8 +145,11 @@ class Room:
     def client_handler(self, sock):
         pid = None
         try:
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            try:
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            except OSError:
+                pass
             sock.settimeout(10)
             reader = sock.makefile("r", encoding="utf-8")
             first = reader.readline(MAX_LINE_LENGTH + 1)
@@ -171,8 +177,9 @@ class Room:
             })
 
             try:
-                where = sock.getpeername()[0]
-            except OSError:
+                peer = sock.getpeername()
+                where = peer[0] if (isinstance(peer, (tuple, list)) and len(peer) > 0) else (str(peer) if peer else "local")
+            except (OSError, IndexError):
                 where = "?"
 
             names = self.player_names()
@@ -222,6 +229,17 @@ class Room:
                             self.broadcast({"type": "chat", "sender": player.name, "text": chat_text, "entry": entry})
                 elif kind == "action":
                     self.incoming_moves.put((pid, message.get("action")))
+                elif kind == "rematch_vote":
+                    self.rematch_votes.add(pid)
+                    with self.lock:
+                        total_conn = len([p for p in self.players if p.player_id == 0 or (p.is_online and p.player_id in self.connections)])
+                        voted_cnt = len(self.rematch_votes)
+                    self.broadcast({
+                        "type": "notice",
+                        "message": f"🗳️ {player.name} voted for a rematch! ({voted_cnt}/{total_conn})"
+                    })
+                elif kind in {"leave", "exit"}:
+                    break
         except (OSError, ValueError):
             pass
         finally:
