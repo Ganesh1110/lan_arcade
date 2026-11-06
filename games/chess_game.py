@@ -723,9 +723,17 @@ def _format_captured_coins(cap_list, is_white_capturer):
     return "  ".join(items) if items else "None"
 
 
-def _render_chess_board(board, last_src=None, last_dest=None, checked_king=None):
+def _render_chess_board(board, last_src=None, last_dest=None, checked_king=None, flip=False):
     lines = []
-    files_header = "      A     B     C     D     E     F     G     H"
+    if flip:
+        files_header = "      H     G     F     E     D     C     B     A"
+        row_indices = list(range(7, -1, -1))
+        col_indices = list(range(7, -1, -1))
+    else:
+        files_header = "      A     B     C     D     E     F     G     H"
+        row_indices = list(range(8))
+        col_indices = list(range(8))
+
     border_top  = "   ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐"
     border_mid  = "   ├─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤"
     border_bot  = "   └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘"
@@ -733,10 +741,10 @@ def _render_chess_board(board, last_src=None, last_dest=None, checked_king=None)
     lines.append(paint(files_header, "1;36"))
     lines.append(border_top)
 
-    for r in range(8):
+    for i, r in enumerate(row_indices):
         rank_num = 8 - r
         row_cells = []
-        for c in range(8):
+        for c in col_indices:
             piece = board[r][c]
             is_light_sq = ((r + c) % 2 == 0)
             is_last_src = (last_src == (r, c))
@@ -770,7 +778,7 @@ def _render_chess_board(board, last_src=None, last_dest=None, checked_king=None)
             row_cells.append(styled)
 
         lines.append(f" {rank_num} │" + "│".join(row_cells) + f"│ {rank_num}")
-        if r < 7:
+        if i < 7:
             lines.append(border_mid)
         else:
             lines.append(border_bot)
@@ -832,8 +840,9 @@ def render_dashboard(view):
     out.append(f"  Captured by Black: {paint(cap_b_str, '1;37')}{lead_b}")
     out.append("")
 
-    # Enhanced Chessboard with move tracking and check highlighting
-    out.append(_render_chess_board(board, last_src, last_dest, checked_king))
+    # Enhanced Chessboard with move tracking and check highlighting (flipped for Black)
+    flip = view.get("flip", view.get("side") == "Black")
+    out.append(_render_chess_board(board, last_src, last_dest, checked_king, flip=flip))
     out.append("")
 
     # High-clarity Coin Legend
