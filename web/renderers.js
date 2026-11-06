@@ -648,4 +648,153 @@
     wrapper.appendChild(kb);
     container.appendChild(wrapper);
   });
+
+  // 7. 2048 RENDERER
+  let game2048KeyHandlerAttached = false;
+  let game2048TouchStartX = 0;
+  let game2048TouchStartY = 0;
+
+  window.LANArcade.registerRenderer('game2048', function (container, view, submitAction) {
+    container.textContent = '';
+    const myBoard = view.my_board || [];
+    const oppBoard = view.opp_board || [];
+    const myScore = view.my_score || 0;
+    const oppScore = view.opp_score || 0;
+    const isMyTurn = window.LANArcade.state.isMyTurn;
+    const oppName = view.opponent_name || 'Opponent';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'g2048-wrapper';
+
+    // Score & Header Row
+    const headerRow = document.createElement('div');
+    headerRow.className = 'g2048-header';
+
+    const scoreCard = document.createElement('div');
+    scoreCard.className = 'g2048-score-box';
+    scoreCard.innerHTML = `<span class="score-label">SCORE</span><span class="score-val">${myScore}</span>`;
+    headerRow.appendChild(scoreCard);
+
+    if (oppBoard && oppBoard.length > 0) {
+      const oppCard = document.createElement('div');
+      oppCard.className = 'g2048-score-box opp-box';
+      oppCard.innerHTML = `<span class="score-label">${oppName}</span><span class="score-val">${oppScore}</span>`;
+      headerRow.appendChild(oppCard);
+    }
+    wrapper.appendChild(headerRow);
+
+    // Main 4x4 Grid
+    const grid = document.createElement('div');
+    grid.className = 'g2048-grid';
+    grid.setAttribute('role', 'grid');
+    grid.setAttribute('aria-label', '2048 Grid');
+
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const val = myBoard[r] ? myBoard[r][c] : 0;
+        const tile = document.createElement('div');
+        tile.className = 'g2048-tile';
+        if (val > 0) {
+          tile.textContent = val;
+          tile.classList.add(`g2048-val-${Math.min(val, 2048)}`);
+        } else {
+          tile.classList.add('g2048-empty');
+        }
+        grid.appendChild(tile);
+      }
+    }
+    wrapper.appendChild(grid);
+
+    // On-screen D-Pad Controls for touch/mouse
+    const dpad = document.createElement('div');
+    dpad.className = 'g2048-dpad';
+
+    const upBtn = document.createElement('button');
+    upBtn.className = 'btn btn-secondary g2048-btn g2048-up';
+    upBtn.textContent = '▲ (W)';
+    upBtn.setAttribute('aria-label', 'Slide Up');
+    if (isMyTurn) upBtn.addEventListener('click', () => submitAction('W'));
+    else upBtn.disabled = true;
+
+    const leftBtn = document.createElement('button');
+    leftBtn.className = 'btn btn-secondary g2048-btn g2048-left';
+    leftBtn.textContent = '◀ (A)';
+    leftBtn.setAttribute('aria-label', 'Slide Left');
+    if (isMyTurn) leftBtn.addEventListener('click', () => submitAction('A'));
+    else leftBtn.disabled = true;
+
+    const downBtn = document.createElement('button');
+    downBtn.className = 'btn btn-secondary g2048-btn g2048-down';
+    downBtn.textContent = '▼ (S)';
+    downBtn.setAttribute('aria-label', 'Slide Down');
+    if (isMyTurn) downBtn.addEventListener('click', () => submitAction('S'));
+    else downBtn.disabled = true;
+
+    const rightBtn = document.createElement('button');
+    rightBtn.className = 'btn btn-secondary g2048-btn g2048-right';
+    rightBtn.textContent = '▶ (D)';
+    rightBtn.setAttribute('aria-label', 'Slide Right');
+    if (isMyTurn) rightBtn.addEventListener('click', () => submitAction('D'));
+    else rightBtn.disabled = true;
+
+    dpad.appendChild(upBtn);
+    const dpadMid = document.createElement('div');
+    dpadMid.className = 'g2048-dpad-mid';
+    dpadMid.appendChild(leftBtn);
+    dpadMid.appendChild(downBtn);
+    dpadMid.appendChild(rightBtn);
+    dpad.appendChild(dpadMid);
+    wrapper.appendChild(dpad);
+
+    // Touch Swipe Support
+    grid.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      game2048TouchStartX = touch.clientX;
+      game2048TouchStartY = touch.clientY;
+    }, { passive: true });
+
+    grid.addEventListener('touchend', (e) => {
+      if (!isMyTurn) return;
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - game2048TouchStartX;
+      const dy = touch.clientY - game2048TouchStartY;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+
+      if (Math.max(absDx, absDy) > 30) {
+        if (absDx > absDy) {
+          submitAction(dx > 0 ? 'D' : 'A');
+        } else {
+          submitAction(dy > 0 ? 'S' : 'W');
+        }
+      }
+    }, { passive: true });
+
+    // Keyboard controls (Arrow keys & WASD)
+    if (!game2048KeyHandlerAttached) {
+      game2048KeyHandlerAttached = true;
+      window.addEventListener('keydown', (e) => {
+        if (window.LANArcade.state.currentGameId !== 'game2048') return;
+        if (!window.LANArcade.state.isMyTurn) return;
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+        const k = e.key.toUpperCase();
+        if (k === 'ARROWUP' || k === 'W') {
+          e.preventDefault();
+          submitAction('W');
+        } else if (k === 'ARROWLEFT' || k === 'A') {
+          e.preventDefault();
+          submitAction('A');
+        } else if (k === 'ARROWDOWN' || k === 'S') {
+          e.preventDefault();
+          submitAction('S');
+        } else if (k === 'ARROWRIGHT' || k === 'D') {
+          e.preventDefault();
+          submitAction('D');
+        }
+      });
+    }
+
+    container.appendChild(wrapper);
+  });
 })();

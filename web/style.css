@@ -1332,3 +1332,110 @@ input:focus, select:focus {
   min-width: 54px;
   font-size: 0.75rem;
 }
+
+/* 7. 2048 */
+.g2048-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 360px;
+}
+
+.g2048-header {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.g2048-score-box {
+  background-color: #bbada0;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-weight: 800;
+  min-width: 80px;
+}
+
+.g2048-score-box.opp-box {
+  background-color: #71717a;
+}
+
+.score-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: #eee4da;
+}
+
+.score-val {
+  font-size: 1.15rem;
+}
+
+.g2048-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  background-color: #bbada0;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  width: 100%;
+  aspect-ratio: 1;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+  touch-action: none;
+}
+
+.g2048-tile {
+  background-color: #cdc1b4;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #776e65;
+  user-select: none;
+}
+
+.g2048-empty {
+  background-color: #cdc1b4;
+}
+
+.g2048-val-2 { background-color: #eee4da; color: #776e65; }
+.g2048-val-4 { background-color: #ede0c8; color: #776e65; }
+.g2048-val-8 { background-color: #f2b179; color: #f9f6f2; }
+.g2048-val-16 { background-color: #f59563; color: #f9f6f2; }
+.g2048-val-32 { background-color: #f67c5f; color: #f9f6f2; }
+.g2048-val-64 { background-color: #f65e3b; color: #f9f6f2; }
+.g2048-val-128 { background-color: #edcf72; color: #f9f6f2; font-size: 1.25rem; }
+.g2048-val-256 { background-color: #edcc61; color: #f9f6f2; font-size: 1.25rem; }
+.g2048-val-512 { background-color: #edc850; color: #f9f6f2; font-size: 1.25rem; }
+.g2048-val-1024 { background-color: #edc53f; color: #f9f6f2; font-size: 1.05rem; }
+.g2048-val-2048 { background-color: #edc22e; color: #f9f6f2; font-size: 1.05rem; box-shadow: 0 0 16px #edc22e; }
+
+.g2048-dpad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 0.75rem;
+  width: 100%;
+}
+
+.g2048-dpad-mid {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  width: 100%;
+}
+
+.g2048-btn {
+  min-height: 40px;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  flex: 1;
+  max-width: 110px;
+}
