@@ -66,11 +66,18 @@ class TestChessGame(unittest.TestCase):
         self.assertNotEqual(chess_game.BLACK_COINS["b"], chess_game.BLACK_COINS["p"])
 
         # Verify board and dashboard include piece guide
-        view = chess_game.view_for(self.state, 0)
-        dash = chess_game.render_dashboard(view)
-        self.assertIn("COIN GUIDE", dash)
-        self.assertIn("Bishop (B)", dash)
-        self.assertIn("Soldier/Pawn (P)", dash)
+        view_white = chess_game.view_for(self.state, 0)
+        dash_white = chess_game.render_dashboard(view_white)
+        self.assertIn("COIN GUIDE", dash_white)
+        self.assertIn("Bishop (B)", dash_white)
+        self.assertIn("Soldier/Pawn (P)", dash_white)
+        # White perspective: files A through H
+        self.assertIn("A     B     C     D     E     F     G     H", dash_white)
+
+        # Black perspective: files H through A (flipped board)
+        view_black = chess_game.view_for(self.state, 1)
+        dash_black = chess_game.render_dashboard(view_black)
+        self.assertIn("H     G     F     E     D     C     B     A", dash_black)
 
     def test_draw_by_insufficient_material(self):
         # King vs King: immediate draw on move
