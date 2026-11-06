@@ -1439,3 +1439,134 @@ input:focus, select:focus {
   flex: 1;
   max-width: 110px;
 }
+
+/* 8. Snake & Ladders */
+.snl-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 520px;
+}
+
+.snl-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.snl-dice-btn {
+  font-size: 1.25rem;
+  padding: 0.75rem 2rem;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+.snl-dice-icon {
+  font-size: 1.8rem;
+  margin-right: 0.4rem;
+}
+
+.snl-active-roll {
+  animation: pulseWin 1s infinite alternate;
+}
+
+.snl-tracker {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.snl-track-item {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+}
+
+.snl-track-item.snl-p1 { border-color: var(--ansi-yellow); color: var(--ansi-yellow); }
+.snl-track-item.snl-p2 { border-color: var(--ansi-cyan); color: var(--ansi-cyan); }
+.snl-track-item.snl-p3 { border-color: var(--ansi-magenta); color: var(--ansi-magenta); }
+.snl-track-item.snl-p4 { border-color: var(--ansi-green); color: var(--ansi-green); }
+
+.snl-board {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  background-color: var(--border-color);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.snl-cell {
+  position: relative;
+  background-color: var(--bg-card);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2px;
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  user-select: none;
+  overflow: hidden;
+}
+
+.snl-cell.snl-ladder {
+  background-color: rgba(16, 185, 129, 0.15);
+}
+
+.snl-cell.snl-snake {
+  background-color: rgba(239, 68, 68, 0.15);
+}
+
+.snl-sq-num {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.snl-feature-badge {
+  font-size: 0.55rem;
+  font-weight: 800;
+  border-radius: 2px;
+  padding: 0 1px;
+  text-align: center;
+}
+
+.ladder-badge {
+  color: var(--success);
+}
+
+.snake-badge {
+  color: var(--danger);
+}
+
+.snl-tokens {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  min-height: 14px;
+}
+
+.snl-token {
+  font-size: 0.55rem;
+  font-weight: 800;
+  padding: 1px 3px;
+  border-radius: 2px;
+  color: #000;
+}
+
+.snl-token-p1 { background-color: var(--ansi-yellow); }
+.snl-token-p2 { background-color: var(--ansi-cyan); }
+.snl-token-p3 { background-color: var(--ansi-magenta); }
+.snl-token-p4 { background-color: var(--ansi-green); }

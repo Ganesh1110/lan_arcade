@@ -797,4 +797,110 @@
 
     container.appendChild(wrapper);
   });
+
+  // 8. SNAKE & LADDERS RENDERER
+  const LADDERS = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+  const SNAKES = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+  const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+
+  window.LANArcade.registerRenderer('snake_and_ladder', function (container, view, submitAction) {
+    container.textContent = '';
+    const positions = view.positions || {};
+    const players = view.players || [];
+    const isMyTurn = window.LANArcade.state.isMyTurn;
+    const lastRoll = view.last_roll || 1;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'snl-wrapper';
+
+    // Summary & Dice Controls Bar
+    const controlsBar = document.createElement('div');
+    controlsBar.className = 'snl-controls';
+
+    const diceBtn = document.createElement('button');
+    diceBtn.className = 'btn btn-primary btn-lg snl-dice-btn';
+    diceBtn.setAttribute('aria-label', 'Roll Dice');
+    const diceIcon = DICE_FACES[lastRoll] || '🎲';
+    diceBtn.innerHTML = `<span class="snl-dice-icon">${diceIcon}</span> <span>ROLL DIE</span>`;
+
+    if (isMyTurn) {
+      diceBtn.classList.add('snl-active-roll');
+      diceBtn.addEventListener('click', () => submitAction('roll'));
+    } else {
+      diceBtn.disabled = true;
+    }
+    controlsBar.appendChild(diceBtn);
+
+    // Positions tracker
+    const tracker = document.createElement('div');
+    tracker.className = 'snl-tracker';
+    players.forEach((p, idx) => {
+      const pos = positions[p.id] || 1;
+      const tag = document.createElement('div');
+      tag.className = `snl-track-item snl-p${idx + 1}`;
+      tag.textContent = `${p.name} (P${idx + 1}): Sq ${pos}`;
+      tracker.appendChild(tag);
+    });
+    controlsBar.appendChild(tracker);
+    wrapper.appendChild(controlsBar);
+
+    // 10x10 Board Grid (Squares 100 down to 1)
+    const boardEl = document.createElement('div');
+    boardEl.className = 'snl-board';
+    boardEl.setAttribute('role', 'grid');
+    boardEl.setAttribute('aria-label', 'Snake and Ladder Board');
+
+    // Generate squares in boustrophedon order (row 10: 100-91, row 9: 81-90, etc.)
+    for (let row = 9; row >= 0; row--) {
+      const isEvenRow = (row % 2 === 1);
+      const cols = [];
+      for (let col = 0; col < 10; col++) {
+        const sqNum = isEvenRow ? (row * 10 + (10 - col)) : (row * 10 + (col + 1));
+        cols.push(sqNum);
+      }
+
+      cols.forEach(sqNum => {
+        const cell = document.createElement('div');
+        cell.className = 'snl-cell';
+        cell.setAttribute('role', 'gridcell');
+
+        const numSpan = document.createElement('span');
+        numSpan.className = 'snl-sq-num';
+        numSpan.textContent = sqNum;
+        cell.appendChild(numSpan);
+
+        if (LADDERS[sqNum]) {
+          cell.classList.add('snl-ladder');
+          const badge = document.createElement('span');
+          badge.className = 'snl-feature-badge ladder-badge';
+          badge.textContent = `▲${LADDERS[sqNum]}`;
+          cell.appendChild(badge);
+        } else if (SNAKES[sqNum]) {
+          cell.classList.add('snl-snake');
+          const badge = document.createElement('span');
+          badge.className = 'snl-feature-badge snake-badge';
+          badge.textContent = `▼${SNAKES[sqNum]}`;
+          cell.appendChild(badge);
+        }
+
+        // Place player tokens on square
+        const tokensDiv = document.createElement('div');
+        tokensDiv.className = 'snl-tokens';
+        players.forEach((p, idx) => {
+          if ((positions[p.id] || 1) === sqNum) {
+            const token = document.createElement('span');
+            token.className = `snl-token snl-token-p${idx + 1}`;
+            token.textContent = `P${idx + 1}`;
+            tokensDiv.appendChild(token);
+          }
+        });
+        cell.appendChild(tokensDiv);
+
+        boardEl.appendChild(cell);
+      });
+    }
+
+    wrapper.appendChild(boardEl);
+    container.appendChild(wrapper);
+  });
 })();
