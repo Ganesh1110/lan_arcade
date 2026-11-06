@@ -769,3 +769,70 @@ input:focus, select:focus {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
 }
+
+/* ======================================================== */
+/* Native Game Boards (Phase 2)                             */
+/* ======================================================== */
+
+.native-board-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 0.5rem;
+}
+
+/* 1. Tic-Tac-Toe */
+.ttt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+}
+
+.ttt-cell {
+  background-color: var(--bg-input);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 2.5rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  min-height: 80px;
+}
+
+.ttt-cell:hover:not(.taken):not(:disabled) {
+  background-color: rgba(56, 189, 248, 0.15);
+  border-color: var(--ansi-cyan);
+  transform: scale(1.02);
+}
+
+.ttt-cell.x-cell {
+  color: var(--ansi-red);
+}
+
+.ttt-cell.o-cell {
+  color: var(--ansi-yellow);
+}
+
+.ttt-cell.winning-cell {
+  background-color: rgba(16, 185, 129, 0.25);
+  border-color: var(--success);
+  animation: pulseWin 1s infinite alternate;
+}
+
+@keyframes pulseWin {
+  from { box-shadow: 0 0 4px var(--success); }
+  to { box-shadow: 0 0 16px var(--success); }
+}

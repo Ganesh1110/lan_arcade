@@ -207,6 +207,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._serve_static_file("style.css", "text/css; charset=utf-8")
             elif path == "/app.js":
                 self._serve_static_file("app.js", "application/javascript; charset=utf-8")
+            elif path == "/renderers.js":
+                self._serve_static_file("renderers.js", "application/javascript; charset=utf-8")
             elif path == "/api/info":
                 self._handle_info()
             elif path == "/api/events":
