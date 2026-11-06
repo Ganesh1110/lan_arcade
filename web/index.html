@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>College LAN Arcade</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="statusBanner" class="status-banner hidden" role="status" aria-live="polite"></div>
+  <div id="toastContainer" class="toast-container" aria-live="assertive"></div>
+
+  <header class="app-header">
+    <div class="header-left">
+      <span class="logo-icon">🕹️</span>
+      <h1 class="app-title">LAN ARCADE</h1>
+    </div>
+    <div class="header-right">
+      <button id="soundToggleBtn" class="icon-btn" title="Toggle Sound" aria-label="Toggle Sound">🔇</button>
+      <button id="chatToggleBtn" class="icon-btn hidden" title="Toggle Chat" aria-label="Toggle Chat">💬<span id="chatBadge" class="chat-badge hidden">0</span></button>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <!-- SCREEN 1: JOIN SCREEN -->
+    <section id="joinScreen" class="screen">
+      <div class="card join-card">
+        <div class="card-header">
+          <h2>Join Match</h2>
+          <p class="subtitle">Play retro & tabletop games across the local network</p>
+        </div>
+        <form id="joinForm" class="form-layout">
+          <div class="form-group">
+            <label for="playerNameInput">Player Name</label>
+            <input type="text" id="playerNameInput" maxlength="24" placeholder="Enter your handle" required autofocus autocomplete="nickname">
+          </div>
+          <div id="passwordGroup" class="form-group hidden">
+            <label for="roomPasswordInput">Room Password</label>
+            <input type="password" id="roomPasswordInput" placeholder="Password required by host">
+          </div>
+          <button type="submit" id="joinBtn" class="btn btn-primary btn-block">Enter Arcade</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: LOBBY SCREEN -->
+    <section id="lobbyScreen" class="screen hidden">
+      <div class="card lobby-card">
+        <div class="card-header lobby-header">
+          <div>
+            <span class="badge" id="lobbyGameBadge">Game</span>
+            <h2 id="lobbyTitle">Game Lobby</h2>
+          </div>
+          <div id="hostNotice" class="host-badge hidden">HOST</div>
+        </div>
+
+        <div class="lobby-content">
+          <div class="players-section">
+            <h3>Players (<span id="playerCount">0</span>)</h3>
+            <ul id="playersList" class="players-list" role="list"></ul>
+          </div>
+
+          <div id="gameSelectorSection" class="form-group">
+            <label for="gameSelector">Select Game</label>
+            <select id="gameSelector" class="form-select" disabled>
+              <option value="">Loading games...</option>
+            </select>
+            <p id="gameSelectorHint" class="hint-text">Only the host can change games.</p>
+          </div>
+        </div>
+
+        <div class="card-footer lobby-actions">
+          <button id="readyToggleBtn" class="btn btn-secondary">Ready Up</button>
+          <button id="hostStartBtn" class="btn btn-success hidden">Start Match</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 3: IN-GAME SCREEN -->
+    <section id="gameScreen" class="screen hidden">
+      <!-- Turn Indicator & Countdown Banner -->
+      <div id="turnBanner" class="turn-banner" role="status" aria-live="polite">
+        <div class="turn-info">
+          <span id="turnIndicatorIcon" class="turn-icon">⏳</span>
+          <span id="turnIndicatorText" class="turn-text">Waiting for game...</span>
+        </div>
+        <div id="timerContainer" class="timer-badge hidden">
+          <span class="timer-icon">⏱️</span>
+          <span id="turnTimerText">45</span>s
+        </div>
+      </div>
+
+      <!-- Game Board Area -->
+      <div class="board-wrapper">
+        <div class="view-controls">
+          <button id="viewToggleBtn" class="btn btn-sm btn-subtle hidden" aria-label="Toggle Graphic/Terminal View">Switch to Terminal View</button>
+        </div>
+
+        <!-- Native Graphic Board (Phase 2) -->
+        <div id="nativeBoardContainer" class="native-board-container hidden"></div>
+
+        <!-- Generic ANSI Dashboard Pre (Phase 1) -->
+        <div id="ansiContainer" class="ansi-container">
+          <pre id="ansiDashboard" class="ansi-dashboard" aria-label="Game board display"></pre>
+        </div>
+      </div>
+
+      <!-- Action & Controls Bar -->
+      <div class="action-bar card">
+        <div id="promptText" class="prompt-text">Waiting for turn...</div>
+        <form id="actionForm" class="action-form">
+          <input type="text" id="actionInput" class="action-input" placeholder="Enter move..." autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" disabled>
+          <button type="submit" id="actionSubmitBtn" class="btn btn-primary" disabled>Submit</button>
+          <button type="button" id="surrenderBtn" class="btn btn-danger" title="Surrender Match">🏳️ Give Up</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: GAME OVER SCREEN -->
+    <section id="gameOverScreen" class="screen hidden">
+      <div class="card game-over-card">
+        <div class="winner-trophy">🏆</div>
+        <h2 id="gameOverTitle">Match Complete</h2>
+        <p id="gameOverMessage" class="game-over-desc"></p>
+        
+        <div id="rematchStatus" class="rematch-status">
+          <span id="rematchVotesText">Votes: 0</span>
+        </div>
+
+        <div class="card-footer game-over-actions">
+          <button id="rematchBtn" class="btn btn-success btn-lg">Rematch 🔄</button>
+          <button id="leaveBtn" class="btn btn-secondary">Leave Lobby</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- CHAT DRAWER / SIDEBAR -->
+  <aside id="chatDrawer" class="chat-drawer closed" aria-label="Chat messages">
+    <div class="chat-header">
+      <h3>Room Chat</h3>
+      <button id="closeChatBtn" class="icon-btn" aria-label="Close Chat">✕</button>
+    </div>
+    <div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div>
+    <form id="chatForm" class="chat-form">
+      <input type="text" id="chatInput" placeholder="Message room..." maxlength="100" autocomplete="off">
+      <button type="submit" class="btn btn-primary btn-sm">Send</button>
+    </form>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>

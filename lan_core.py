@@ -44,7 +44,9 @@ from games import (
 def host_menu():
     while True:
         clear_screen()
+        web_st = paint(f"ENABLED (Port {config.DEFAULT_WEB_PORT})", "1;32") if config.WEB_ENABLED else paint("OFF (Terminal Only)", "31")
         options = [
+            f"Toggle Web Browser Mode (Currently: {web_st})",
             f"Bingo ({bingo.min_players}–{bingo.max_players} players)",
             f"Connect Four ({connect4.min_players} players)",
             f"Battleship ({battleship.min_players} players)",
@@ -73,74 +75,81 @@ def host_menu():
         choice = input("Select game option: ").strip()
 
         if choice == "1":
+            config.WEB_ENABLED = not config.WEB_ENABLED
+            st = "ENABLED 🌐" if config.WEB_ENABLED else "OFF 🔲"
+            print(paint(f"\n  Web Browser Mode {st}!", "1;33"))
+            time.sleep(0.6)
+            continue
+        elif choice == "2":
             host_lan_game_session(bingo)
             break
-        elif choice == "2":
+        elif choice == "3":
             host_lan_game_session(connect4)
             break
-        elif choice == "3":
-            host_lan_game_session(battleship)
         elif choice == "4":
-            host_lan_game_session(dots_and_boxes)
+            host_lan_game_session(battleship)
             break
         elif choice == "5":
-            host_lan_game_session(tic_tac_toe)
+            host_lan_game_session(dots_and_boxes)
             break
         elif choice == "6":
-            host_lan_game_session(hangman)
+            host_lan_game_session(tic_tac_toe)
             break
         elif choice == "7":
-            host_lan_game_session(shiritori)
+            host_lan_game_session(hangman)
             break
         elif choice == "8":
-            host_lan_game_session(game2048)
+            host_lan_game_session(shiritori)
             break
         elif choice == "9":
-            host_lan_game_session(boggle)
+            host_lan_game_session(game2048)
             break
         elif choice == "10":
-            host_lan_game_session(mini_crossword)
+            host_lan_game_session(boggle)
             break
         elif choice == "11":
-            host_lan_game_session(wordoku)
+            host_lan_game_session(mini_crossword)
             break
         elif choice == "12":
-            host_lan_game_session(scrabble_sprint)
+            host_lan_game_session(wordoku)
             break
         elif choice == "13":
-            host_lan_game_session(snake_and_ladder)
+            host_lan_game_session(scrabble_sprint)
             break
         elif choice == "14":
-            host_lan_game_session(chess_game)
+            host_lan_game_session(snake_and_ladder)
             break
         elif choice == "15":
-            host_lan_game_session(wordle)
+            host_lan_game_session(chess_game)
             break
         elif choice == "16":
-            host_lan_game_session(quiz_show)
+            host_lan_game_session(wordle)
             break
         elif choice == "17":
-            host_lan_game_session(typing_racer)
+            host_lan_game_session(quiz_show)
             break
         elif choice == "18":
-            host_lan_game_session(artillery)
+            host_lan_game_session(typing_racer)
             break
         elif choice == "19":
-            host_lan_game_session(snake_duel)
+            host_lan_game_session(artillery)
             break
         elif choice == "20":
-            host_lan_game_session(sonar)
+            host_lan_game_session(snake_duel)
             break
         elif choice == "21":
-            host_lan_game_session(arrow_man)
+            host_lan_game_session(sonar)
             break
         elif choice == "22":
+            host_lan_game_session(arrow_man)
+            break
+        elif choice == "23":
             host_lan_game_session(memory_match)
             break
-        elif choice == "23" or choice.lower() in {"q", "back", "exit"}:
+        elif choice == "24" or choice.lower() in {"q", "back", "exit"}:
             break
         else:
-            print("Please enter 1–23.")
+            print("Please enter 1–24.")
             input("Press Enter to continue...")
 
 
@@ -248,7 +257,24 @@ def main():
             input("Press Enter to continue...")
 
 
+def parse_cli_args():
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--web":
+            config.WEB_ENABLED = True
+            if i + 1 < len(args) and args[i + 1].isdigit():
+                config.DEFAULT_WEB_PORT = int(args[i + 1])
+                i += 1
+        elif arg == "--password" and i + 1 < len(args):
+            config.ARCADE_PASSWORD = args[i + 1]
+            i += 1
+        i += 1
+
+
 if __name__ == "__main__":
+    parse_cli_args()
     try:
         if "--server" in sys.argv:
             from core.server import run_dedicated_server

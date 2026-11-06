@@ -459,7 +459,7 @@ def play_lan_host(room):
     return handle_post_match_rematch(room, gm, msg, winners)
 
 
-def render_host_lobby(room, host_ip, port):
+def render_host_lobby(room, host_ip, port, web_url=None, qr_ascii=None):
     lines = [
         paint("=" * 56, "1;36"),
         paint(f"       LAN {room.game_module.game_name.upper()} HOST LOBBY", "1;36"),
@@ -468,9 +468,17 @@ def render_host_lobby(room, host_ip, port):
         f"  Host IP address : {paint(host_ip, '1;33')}",
         f"  Port            : {paint(port, '1;33')}",
         f"  Required Players: {room.min_players}–{room.max_players} players",
+    ]
+    if web_url:
+        lines.append(f"  🌐 Web Browser  : {paint(web_url, '1;32')}")
+        if qr_ascii:
+            lines.append("")
+            lines.append(paint("  Scan on Phone to Join:", "1;36"))
+            lines.append(qr_ascii)
+    lines.extend([
         "",
         f"  Connected Players ({len(room.players)}/{room.max_players}):"
-    ]
+    ])
     with room.lock:
         for i, p in enumerate(room.players, 1):
             host_tag = " " + paint("[HOST]", "1;33") if p.is_host else ""
@@ -486,7 +494,8 @@ def render_host_lobby(room, host_ip, port):
     return "\n".join(lines)
 
 
-def host_lan_game_session(game_module):
+def host_lan_game_session(game_module, web_port=None, password=None):
+    import config
     clear_screen()
     print(paint("=" * 56, "1;36"))
     print(paint(f"         HOST LAN: {game_module.game_name.upper()}", "1;36"))
@@ -521,6 +530,34 @@ def host_lan_game_session(game_module):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     host_ip = get_lan_ip()
 
+    # Start Web Gateway if enabled
+    web_gateway = None
+    web_url = None
+    qr_ascii = None
+    target_web_port = web_port if web_port is not None else (config.DEFAULT_WEB_PORT if config.WEB_ENABLED else None)
+    room_pwd = password if password is not None else config.ARCADE_PASSWORD
+
+    if target_web_port is not None or config.WEB_ENABLED:
+        try:
+            from core.web_gateway import WebGateway
+            from utils.qr import render_qr_ascii
+            port_to_bind = target_web_port or config.DEFAULT_WEB_PORT
+            web_gateway = WebGateway(
+                tcp_port=bound_port,
+                web_port=port_to_bind,
+                password=room_pwd,
+                max_players=room.max_players
+            )
+            actual_web_port = web_gateway.start()
+            web_url = f"http://{host_ip}:{actual_web_port}"
+            try:
+                qr_ascii = render_qr_ascii(web_url)
+            except Exception:
+                qr_ascii = None
+        except Exception as e:
+            print(paint(f"\n[!] Note: Web gateway could not start: {e}", "33"))
+            web_gateway = None
+
     # Start LAN discovery beacon
     beacon_stop = None
     try:
@@ -537,7 +574,7 @@ def host_lan_game_session(game_module):
     try:
         while True:
             clear_screen()
-            print(render_host_lobby(room, host_ip, bound_port))
+            print(render_host_lobby(room, host_ip, bound_port, web_url=web_url, qr_ascii=qr_ascii))
             if bound_port != DEFAULT_PORT:
                 print(paint(f"\n  Notice: Port {DEFAULT_PORT} was busy; hosted on port {bound_port} instead.", "1;33"))
                 print(f"  Tell players to join with port: {paint(bound_port, '1;33')}")
@@ -560,7 +597,8 @@ def host_lan_game_session(game_module):
                     curr_cnt = len(room.players)
                     req_cnt = room.min_players
                     print(paint(f"\n[!] Need at least {req_cnt} players to start (currently {curr_cnt} joined).", "1;31"))
-                    print(f"    Ask friends to run '2. Join a LAN Game' connecting to {host_ip}:{bound_port}")
+                    join_hint = f"Ask friends to open {web_url} in their browser or join port {bound_port}" if web_url else f"Ask friends to run '2. Join a LAN Game' connecting to {host_ip}:{bound_port}"
+                    print(f"    {join_hint}")
                     input("\nPress Enter to continue waiting...")
 
         clear_screen()
@@ -574,6 +612,11 @@ def host_lan_game_session(game_module):
         room.broadcast({"type": "end", "message": "Host stopped the game."})
     finally:
         room.closed = True
+        if web_gateway is not None:
+            try:
+                web_gateway.stop()
+            except Exception:
+                pass
         if beacon_stop is not None:
             try:
                 beacon_stop.set()
