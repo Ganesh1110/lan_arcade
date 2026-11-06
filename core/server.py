@@ -506,7 +506,8 @@ def host_lan_game_session(game_module, web_port=None, password=None):
         return
 
     host_name = clean_name(raw_name, "Host")
-    room = Room(host_name, game_module)
+    room_pwd = password if password is not None else config.ARCADE_PASSWORD
+    room = Room(host_name, game_module, password=room_pwd)
 
     server = None
     bound_port = DEFAULT_PORT
@@ -633,7 +634,7 @@ def host_lan_game_session(game_module, web_port=None, password=None):
 def run_dedicated_server(port=DEFAULT_PORT):
     """Run dedicated office arcade server listening 24/7."""
     from games import bingo
-    room = Room("OfficeServer", bingo)
+    room = Room("OfficeServer", bingo, password=config.ARCADE_PASSWORD)
     try:
         server = LanTCPServer(("0.0.0.0", port), room)
     except OSError as exc:

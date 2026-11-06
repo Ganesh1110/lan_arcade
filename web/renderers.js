@@ -672,13 +672,27 @@
 
     const scoreCard = document.createElement('div');
     scoreCard.className = 'g2048-score-box';
-    scoreCard.innerHTML = `<span class="score-label">SCORE</span><span class="score-val">${myScore}</span>`;
+    const scoreLabel = document.createElement('span');
+    scoreLabel.className = 'score-label';
+    scoreLabel.textContent = 'SCORE';
+    const scoreVal = document.createElement('span');
+    scoreVal.className = 'score-val';
+    scoreVal.textContent = String(myScore);
+    scoreCard.appendChild(scoreLabel);
+    scoreCard.appendChild(scoreVal);
     headerRow.appendChild(scoreCard);
 
     if (oppBoard && oppBoard.length > 0) {
       const oppCard = document.createElement('div');
       oppCard.className = 'g2048-score-box opp-box';
-      oppCard.innerHTML = `<span class="score-label">${oppName}</span><span class="score-val">${oppScore}</span>`;
+      const oppLabel = document.createElement('span');
+      oppLabel.className = 'score-label';
+      oppLabel.textContent = oppName;
+      const oppVal = document.createElement('span');
+      oppVal.className = 'score-val';
+      oppVal.textContent = String(oppScore);
+      oppCard.appendChild(oppLabel);
+      oppCard.appendChild(oppVal);
       headerRow.appendChild(oppCard);
     }
     wrapper.appendChild(headerRow);
@@ -821,7 +835,13 @@
     diceBtn.className = 'btn btn-primary btn-lg snl-dice-btn';
     diceBtn.setAttribute('aria-label', 'Roll Dice');
     const diceIcon = DICE_FACES[lastRoll] || '🎲';
-    diceBtn.innerHTML = `<span class="snl-dice-icon">${diceIcon}</span> <span>ROLL DIE</span>`;
+    const diceIconSpan = document.createElement('span');
+    diceIconSpan.className = 'snl-dice-icon';
+    diceIconSpan.textContent = diceIcon;
+    const rollTextSpan = document.createElement('span');
+    rollTextSpan.textContent = 'ROLL DIE';
+    diceBtn.appendChild(diceIconSpan);
+    diceBtn.appendChild(rollTextSpan);
 
     if (isMyTurn) {
       diceBtn.classList.add('snl-active-roll');

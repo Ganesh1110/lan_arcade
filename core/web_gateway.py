@@ -8,6 +8,7 @@ import copy
 import html
 import http.cookies
 import http.server
+import hmac
 import json
 import os
 import queue
@@ -36,13 +37,15 @@ _color_lock = threading.Lock()
 class BrowserSession:
     """Represents a connected browser player session backed by a local TCP client socket."""
 
-    def __init__(self, token: str, sock: socket.socket, player_id: int, name: str):
+    def __init__(self, token: str, sock: socket.socket, player_id: int, name: str, client_ip: str = "127.0.0.1"):
         self.token = token
         self.sock = sock
         self.player_id = player_id
         self.name = name
+        self.client_ip = client_ip
         self.event_queue: queue.Queue = queue.Queue(maxsize=1000)
         self.last_active = time.time()
+        self.active_streams = 0
         self.last_state: Optional[dict] = None
         self.closed = False
         self.lock = threading.Lock()
@@ -84,6 +87,13 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
     """HTTP and SSE request handler for Web Gateway."""
 
     server_version = "ArcadeGateway/1.0"
+
+    def setup(self):
+        super().setup()
+        try:
+            self.request.settimeout(10.0)
+        except (OSError, AttributeError):
+            pass
 
     def log_message(self, format, *args):
         # Silence default stderr logging to keep console clean
@@ -215,8 +225,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._handle_events()
             else:
                 self._send_error(404, "Not Found")
-        except Exception as e:
-            self._send_error(500, f"Server error: {e}")
+        except Exception:
+            self._send_error(500, "Internal server error.")
 
     def do_POST(self):
         try:
@@ -247,8 +257,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._handle_start_game()
             else:
                 self._send_error(404, "Unknown endpoint.")
-        except Exception as e:
-            self._send_error(500, f"Server error: {e}")
+        except Exception:
+            self._send_error(500, "Internal server error.")
 
     def _serve_static_file(self, filename: str, content_type: str):
         filepath = os.path.join(WEB_DIR, filename)
@@ -264,8 +274,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
-        except OSError as e:
-            self._send_error(500, f"Read error: {e}")
+        except OSError:
+            self._send_error(500, "Internal server error.")
 
     def _handle_info(self):
         games_list = [
@@ -304,34 +314,48 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         # 1. Password verification
         if self.gateway.password:
             provided_pwd = str(data.get("password", "")).strip()
-            if provided_pwd != self.gateway.password:
+            if not hmac.compare_digest(provided_pwd, self.gateway.password):
                 self._send_error(401, "Invalid room password.")
                 return
 
-        # 2. Session cap enforcement
+        # 2. Per-IP session limit (max 2 active sessions per IP)
+        client_ip = self._get_client_ip()
+        with self.gateway.sessions_lock:
+            active_ip_sessions = [
+                s for s in self.gateway.sessions.values()
+                if not s.closed and s.client_ip == client_ip
+            ]
+            if len(active_ip_sessions) >= self.gateway.max_sessions_per_ip:
+                self._send_error(429, "Too many active sessions from this IP address.")
+                return
+
+        # 3. Session cap enforcement
         active_cnt = self.gateway.session_count()
         allowed_max = self.gateway.max_players + self.gateway.spectator_cap
         if active_cnt >= allowed_max:
             self._send_error(403, f"Room capacity reached ({active_cnt}/{allowed_max} players).")
             return
 
-        # 3. Clean player name
+        # 4. Clean player name
         raw_name = data.get("name", "WebGuest")
         name = clean_name(str(raw_name), "WebGuest")
 
-        # 4. Connect to host TCP port
+        # 5. Connect to host TCP port
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             sock.settimeout(5.0)
             sock.connect((self.gateway.tcp_host, self.gateway.tcp_port))
-        except OSError as e:
-            self._send_error(503, f"Could not connect to host TCP server: {e}")
+        except OSError:
+            self._send_error(503, "Could not connect to host TCP server.")
             return
 
-        # 5. Send join handshake
+        # 6. Send join handshake with room password if set
         try:
-            sock.sendall(encode_message({"type": "join", "name": name}))
+            join_payload = {"type": "join", "name": name}
+            if self.gateway.password:
+                join_payload["password"] = self.gateway.password
+            sock.sendall(encode_message(join_payload))
             reader = sock.makefile("r", encoding="utf-8")
             first_line = reader.readline(65536)
             resp = decode_message(first_line)
@@ -343,18 +367,18 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
 
             player_id = resp["player_id"]
             assigned_name = resp.get("name", name)
-        except (OSError, ValueError) as e:
+        except (OSError, ValueError):
             sock.close()
-            self._send_error(500, f"Join exchange failed: {e}")
+            self._send_error(500, "Join exchange failed.")
             return
 
-        # 6. Create BrowserSession
+        # 7. Create BrowserSession
         token = secrets.token_urlsafe(32)
         sock.settimeout(None)
-        session = BrowserSession(token, sock, player_id, assigned_name)
+        session = BrowserSession(token, sock, player_id, assigned_name, client_ip=client_ip)
         self.gateway.add_session(token, session)
 
-        # 7. Start background TCP reader thread for this session
+        # 8. Start background TCP reader thread for this session
         t = threading.Thread(target=self.gateway.run_tcp_reader, args=(session,), daemon=True)
         t.start()
 
@@ -383,43 +407,51 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             self._send_error(401, "Session not found or expired. Please join again.")
             return
 
-        self.send_response(200)
-        self._send_security_headers("text/event-stream; charset=utf-8")
-        self.send_header("Connection", "keep-alive")
-        self.send_header("X-Accel-Buffering", "no")
-        self.end_headers()
-
-        # Send initial SSE handshake comment
+        session.active_streams += 1
         try:
-            self.wfile.write(b": connected\n\n")
-            self.wfile.flush()
-        except OSError:
-            return
+            self.send_response(200)
+            self._send_security_headers("text/event-stream; charset=utf-8")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
 
-        # Replay latest state if reconnected
-        if session.last_state:
+            # Send initial SSE handshake comment
             try:
-                line = f"data: {json.dumps(session.last_state, ensure_ascii=False)}\n\n"
-                self.wfile.write(line.encode("utf-8"))
+                self.wfile.write(b": connected\n\n")
                 self.wfile.flush()
+                session.touch()
             except OSError:
                 return
 
-        # Stream loop
-        while not session.closed and self.gateway.running:
-            try:
-                msg = session.event_queue.get(timeout=15.0)
-                line = f"data: {json.dumps(msg, ensure_ascii=False)}\n\n"
-                self.wfile.write(line.encode("utf-8"))
-                self.wfile.flush()
-            except queue.Empty:
+            # Replay latest state if reconnected
+            if session.last_state:
                 try:
-                    self.wfile.write(b": keep-alive\n\n")
+                    line = f"data: {json.dumps(session.last_state, ensure_ascii=False)}\n\n"
+                    self.wfile.write(line.encode("utf-8"))
                     self.wfile.flush()
+                    session.touch()
                 except OSError:
+                    return
+
+            # Stream loop
+            while not session.closed and self.gateway.running:
+                try:
+                    msg = session.event_queue.get(timeout=1.0)
+                    session.touch()
+                    line = f"data: {json.dumps(msg, ensure_ascii=False)}\n\n"
+                    self.wfile.write(line.encode("utf-8"))
+                    self.wfile.flush()
+                except queue.Empty:
+                    try:
+                        self.wfile.write(b": keep-alive\n\n")
+                        self.wfile.flush()
+                        session.touch()
+                    except OSError:
+                        break
+                except (BrokenPipeError, ConnectionResetError, OSError):
                     break
-            except (BrokenPipeError, ConnectionResetError, OSError):
-                break
+        finally:
+            session.active_streams = max(0, session.active_streams - 1)
 
     def _handle_action(self):
         session = self._get_session()
@@ -528,7 +560,9 @@ class WebGateway:
         web_port: int = 8080,
         password: Optional[str] = None,
         max_players: int = 4,
-        spectator_cap: int = 0
+        spectator_cap: int = 0,
+        idle_timeout: float = IDLE_SESSION_TIMEOUT,
+        max_sessions_per_ip: int = 2
     ):
         self.tcp_host = tcp_host
         self.tcp_port = tcp_port
@@ -537,6 +571,8 @@ class WebGateway:
         self.password = password or os.getenv("ARCADE_PASSWORD") or None
         self.max_players = max_players
         self.spectator_cap = spectator_cap
+        self.idle_timeout = idle_timeout
+        self.max_sessions_per_ip = max_sessions_per_ip
 
         self.sessions: Dict[str, BrowserSession] = {}
         self.sessions_lock = threading.RLock()
@@ -595,6 +631,7 @@ class WebGateway:
                 msg = decode_message(line)
                 if not msg:
                     continue
+                session.touch()
 
                 # Augment view payloads with rendered HTML and prompt
                 kind = msg.get("type")
@@ -674,12 +711,12 @@ class WebGateway:
 
     def _cleanup_idle_loop(self):
         while self.running:
-            time.sleep(30.0)
+            time.sleep(min(1.0, max(0.2, self.idle_timeout / 4.0)))
             now = time.time()
             to_remove = []
             with self.sessions_lock:
                 for token, s in list(self.sessions.items()):
-                    if s.closed or (now - s.last_active > IDLE_SESSION_TIMEOUT):
+                    if s.closed or (s.active_streams == 0 and (now - s.last_active > self.idle_timeout)):
                         to_remove.append(token)
             for tok in to_remove:
                 self.remove_session(tok)

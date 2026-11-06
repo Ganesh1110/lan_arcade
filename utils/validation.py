@@ -3,9 +3,12 @@ Input validation utilities.
 """
 
 
+DISALLOWED_NAME_CHARS = set('<>"\'&`')
+
+
 def clean_name(raw, default="Player"):
-    """Sanitize player name string."""
-    name = "".join(ch for ch in str(raw) if ch.isprintable()).strip()[:20]
+    """Sanitize player name string, stripping HTML/injection characters and non-printables."""
+    name = "".join(ch for ch in str(raw) if ch.isprintable() and ch not in DISALLOWED_NAME_CHARS).strip()[:20]
     return name or default
 
 

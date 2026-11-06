@@ -201,10 +201,9 @@ When a multiplayer match concludes:
 
 ## 🔒 Network Architecture & Security Note
 
-- **Open LAN Design**: College LAN Arcade binds its TCP socket server to `0.0.0.0` (all local network interfaces) on port `50555` with UDP broadcast beacon discovery to enable zero-configuration, friction-free peer joining without credentials.
-- **Trusted Networks**: By design for campus dorms and hackathons, there is no transport encryption or authentication layer. Anyone connected to the same local subnet / Wi-Fi can discover and join open lobbies.
-- **Buffer Safety**: Sockets enforce a strict 64 KB line length limit (`reader.readline(65536)`) to safeguard against buffer exhaustion, and in-game lobby commands (`!game`) are strictly restricted to the host before a match begins.
-- If hosting on a multi-homed or exposed machine, ensure firewall rules or Docker network isolation limit access to trusted peers.
+- **Open LAN & Optional Password Protection**: College LAN Arcade binds its TCP socket server to `0.0.0.0` (all local network interfaces) on port `50555` with UDP broadcast beacon discovery to enable friction-free peer joining. When a room password is set (via `--password <pwd>` or the `ARCADE_PASSWORD` environment variable), password verification using `hmac.compare_digest` is strictly enforced for both the Web Gateway and direct TCP socket join handshakes. Terminal clients are prompted for the room password if not provided via environment variable.
+- **Trusted Networks**: LAN Arcade is designed for LAN environments (campus dorms, home networks, hackathons). While buffer safety, input sanitization, rate limiting, and room passwords protect against unauthorized joins and exploits, transport encryption (TLS) is not applied. Run within trusted LANs or behind secure tunnels (e.g., WireGuard/Tailscale) if connecting across public networks.
+- **Buffer Safety & Rate Limiting**: Both TCP sockets and HTTP endpoints enforce a strict 64 KB payload/line limit (`reader.readline(65536)` / `MAX_BODY_SIZE`) to safeguard against buffer exhaustion. The Web Gateway enforces per-IP rate limiting, a 2-session-per-IP cap, 10s socket timeouts, and strict Content-Security-Policy (CSP) headers without inline scripts. In-game lobby controls (`!game`, `!start`) remain strictly host-authoritative.
 
 ---
 

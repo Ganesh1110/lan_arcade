@@ -15,9 +15,10 @@ from utils.validation import clean_name
 
 
 class ClientSession:
-    def __init__(self, sock, name):
+    def __init__(self, sock, name, password=None):
         self.sock = sock
         self.name = name
+        self.password = password
         self.send_lock = threading.Lock()
         self.screen_lock = threading.RLock()
         self.turn_event = threading.Event()
@@ -254,7 +255,10 @@ class ClientSession:
             return
 
     def run(self):
-        self.send({"type": "join", "name": self.name})
+        join_payload = {"type": "join", "name": self.name}
+        if self.password:
+            join_payload["password"] = self.password
+        self.send(join_payload)
         thread = threading.Thread(target=self.receive_loop, daemon=True)
         thread.start()
         try:
@@ -391,6 +395,14 @@ def join_lan_game():
         target_port = int(port_raw) if port_raw else DEFAULT_PORT
 
     name = clean_name(input("  Your player name: "), "Guest")
+    import os
+    env_pwd = os.getenv("ARCADE_PASSWORD")
+    if env_pwd:
+        pwd = env_pwd
+    else:
+        raw_pwd = input("  Room password (press Enter if none): ").strip()
+        pwd = raw_pwd or None
+
     print(f"\n  Connecting to {target_host}:{target_port} ...")
     try:
         sock = socket.create_connection((target_host, target_port), timeout=10)
@@ -402,7 +414,7 @@ def join_lan_game():
         input("\n  Press Enter to return to main menu...")
         return
 
-    session = ClientSession(sock, name)
+    session = ClientSession(sock, name, password=pwd)
     try:
         session.run()
     except KeyboardInterrupt:

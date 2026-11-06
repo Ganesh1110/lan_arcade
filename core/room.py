@@ -1,7 +1,9 @@
 """
 Room class manages connected sessions, lobby state, thread safety, and move queues.
 """
+import hmac
 import json
+import os
 import queue
 import socket
 import threading
@@ -18,11 +20,12 @@ MAX_LINE_LENGTH = 65536
 
 
 class Room:
-    def __init__(self, host_name, game_module):
+    def __init__(self, host_name, game_module, password=None):
         self.lock = threading.RLock()
         self.game_module = game_module
         self.max_players = getattr(game_module, "max_players", MAX_PLAYERS)
         self.min_players = getattr(game_module, "min_players", 2)
+        self.password = password or os.getenv("ARCADE_PASSWORD") or None
 
         # Host is player_id = 0
         host_session = PlayerSession(0, host_name, is_host=True)
@@ -160,6 +163,12 @@ class Room:
             if not request or request.get("type") != "join":
                 sock.sendall(encode_message({"type": "reject", "message": "Expected join request."}))
                 return
+
+            if self.password:
+                req_pwd = str(request.get("password") or "")
+                if not hmac.compare_digest(req_pwd, self.password):
+                    sock.sendall(encode_message({"type": "reject", "message": "Incorrect room password."}))
+                    return
 
             sock.settimeout(None)
             raw_name = request.get("name", "Guest")

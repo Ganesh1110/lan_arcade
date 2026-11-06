@@ -85,6 +85,7 @@ class SSEClient:
         self.headers = headers or {}
         self.events = queue.Queue()
         self.running = True
+        self.resp = None
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
@@ -92,6 +93,7 @@ class SSEClient:
         req = urllib.request.Request(self.url, headers=self.headers)
         try:
             with urllib.request.urlopen(req, timeout=10.0) as resp:
+                self.resp = resp
                 while self.running:
                     line_bytes = resp.readline()
                     if not line_bytes:
@@ -111,6 +113,11 @@ class SSEClient:
 
     def close(self):
         self.running = False
+        if self.resp:
+            try:
+                self.resp.close()
+            except Exception:
+                pass
 
 
 class TestWebGateway(unittest.TestCase):
@@ -524,6 +531,211 @@ class TestInformationPrivacy(unittest.TestCase):
         self.assertIn("options", curr_q)
         self.assertNotIn("answer", curr_q)
         self.assertNotIn("fact", curr_q)
+
+
+class TestNameSanitization(unittest.TestCase):
+    """Verify name sanitization strips HTML tags, quotes, backticks, and ampersands."""
+
+    def test_strip_html_and_hostile_characters(self):
+        from utils.validation import clean_name
+        # Strips < > " ' & `
+        self.assertEqual(clean_name("<b>x</b>"), "bx/b")
+        self.assertEqual(clean_name("<a href=//x>"), "a href=//x")
+        self.assertEqual(clean_name("`test` '\" &"), "test")
+        self.assertEqual(clean_name("Normal Player"), "Normal Player")
+        self.assertEqual(clean_name("<script>alert(1)</script>", default="Guest"), "scriptalert(1)/scrip")
+        self.assertEqual(clean_name("<>\"'`&", default="DefaultName"), "DefaultName")
+
+
+class TestSecurityHardeningAndEnforcement(unittest.TestCase):
+    """
+    Verify security hardening fixes:
+    1. TCP join password verification with hmac.compare_digest in Room
+    2. Idle timeout surviving with active SSE stream
+    3. Per-IP session limit (max 2)
+    """
+
+    def test_room_tcp_password_enforcement(self):
+        room = Room("Host", tic_tac_toe, password="supersecretpass")
+        server = LanTCPServer(("127.0.0.1", 0), room)
+        port = server.server_address[1]
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        try:
+            # 1. Join with no password -> reject
+            s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                s1.connect(("127.0.0.1", port))
+            except (PermissionError, OSError) as e:
+                self.skipTest(f"Loopback restricted in sandbox: {e}")
+            s1.sendall(encode_message({"type": "join", "name": "Attacker"}))
+            r1 = s1.makefile("r", encoding="utf-8")
+            resp1 = decode_message(r1.readline())
+            self.assertEqual(resp1.get("type"), "reject")
+            self.assertIn("Incorrect room password", resp1.get("message", ""))
+            s1.close()
+
+            # 2. Join with wrong password -> reject
+            s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s2.connect(("127.0.0.1", port))
+            s2.sendall(encode_message({"type": "join", "name": "Attacker", "password": "wrongpassword"}))
+            r2 = s2.makefile("r", encoding="utf-8")
+            resp2 = decode_message(r2.readline())
+            self.assertEqual(resp2.get("type"), "reject")
+            self.assertIn("Incorrect room password", resp2.get("message", ""))
+            s2.close()
+
+            # 3. Join with correct password -> joined
+            s3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s3.connect(("127.0.0.1", port))
+            s3.sendall(encode_message({"type": "join", "name": "ValidPlayer", "password": "supersecretpass"}))
+            r3 = s3.makefile("r", encoding="utf-8")
+            resp3 = decode_message(r3.readline())
+            self.assertEqual(resp3.get("type"), "joined")
+            self.assertEqual(resp3.get("player_id"), 1)
+            s3.close()
+        finally:
+            room.closed = True
+            server.shutdown()
+            server.server_close()
+
+    def test_idle_timeout_with_open_sse_stream_survives(self):
+        room = Room("Host", tic_tac_toe)
+        server = LanTCPServer(("127.0.0.1", 0), room)
+        tcp_port = server.server_address[1]
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+
+        # Gateway with 2 second idle timeout
+        gw = WebGateway(
+            tcp_port=tcp_port,
+            tcp_host="127.0.0.1",
+            web_host="127.0.0.1",
+            web_port=0,
+            max_players=4,
+            idle_timeout=2.0
+        )
+        try:
+            web_port = gw.start()
+        except (PermissionError, OSError) as e:
+            self.skipTest(f"Loopback restricted in sandbox: {e}")
+
+        base_url = f"http://127.0.0.1:{web_port}"
+        sse = None
+        try:
+            # Join session
+            req = urllib.request.Request(
+                f"{base_url}/api/join",
+                data=json.dumps({"name": "ActivePlayer"}).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    res_data = json.loads(resp.read().decode("utf-8"))
+            except (urllib.error.URLError, PermissionError, OSError) as e:
+                self.skipTest(f"Loopback restricted in sandbox: {e}")
+
+            tok = res_data["token"]
+            self.assertIsNotNone(gw.get_session(tok))
+
+            # Connect SSE client
+            sse = SSEClient(f"{base_url}/api/events", {"X-Session-Token": tok})
+            # Wait 2.5s (longer than the 2.0s idle timeout)
+            time.sleep(2.5)
+
+            # Session MUST still be alive because active_streams > 0 and keep-alives touch last_active
+            sess = gw.get_session(tok)
+            self.assertIsNotNone(sess, "Session with open SSE stream should not be pruned")
+            self.assertFalse(sess.closed)
+
+            # Now close SSE stream
+            sse.close()
+
+            # Wait for session without open SSE stream to be pruned by cleanup loop (up to 5s)
+            pruned = False
+            for _ in range(50):
+                time.sleep(0.1)
+                if gw.get_session(tok) is None:
+                    pruned = True
+                    break
+            self.assertTrue(pruned, "Idle session without open SSE stream should be pruned")
+        finally:
+            if sse:
+                sse.close()
+            gw.stop()
+            room.closed = True
+            server.shutdown()
+            server.server_close()
+
+    def test_per_ip_session_limit(self):
+        room = Room("Host", tic_tac_toe)
+        room.max_players = 10
+        server = LanTCPServer(("127.0.0.1", 0), room)
+        tcp_port = server.server_address[1]
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+
+        gw = WebGateway(
+            tcp_port=tcp_port,
+            tcp_host="127.0.0.1",
+            web_host="127.0.0.1",
+            web_port=0,
+            max_players=10,
+            max_sessions_per_ip=2
+        )
+        try:
+            web_port = gw.start()
+        except (PermissionError, OSError) as e:
+            self.skipTest(f"Loopback restricted in sandbox: {e}")
+
+        base_url = f"http://127.0.0.1:{web_port}"
+
+        try:
+            def join(name):
+                req = urllib.request.Request(
+                    f"{base_url}/api/join",
+                    data=json.dumps({"name": name}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=5.0) as resp:
+                        return resp.status, json.loads(resp.read().decode("utf-8"))
+                except urllib.error.HTTPError as e:
+                    return e.code, json.loads(e.read().decode("utf-8"))
+                except (urllib.error.URLError, PermissionError, OSError) as e:
+                    self.skipTest(f"Loopback restricted in sandbox: {e}")
+
+            # Session 1: OK
+            st1, res1 = join("GuestA")
+            self.assertEqual(st1, 200)
+
+            # Session 2: OK
+            st2, res2 = join("GuestB")
+            self.assertEqual(st2, 200)
+
+            # Session 3: Rejected with 429
+            st3, res3 = join("GuestC")
+            self.assertEqual(st3, 429)
+            self.assertIn("Too many active sessions", res3.get("error", ""))
+
+            # Leave Session 1
+            leave_req = urllib.request.Request(
+                f"{base_url}/api/leave",
+                data=b"{}",
+                headers={"Content-Type": "application/json", "X-Session-Token": res1["token"]},
+                method="POST"
+            )
+            with urllib.request.urlopen(leave_req, timeout=5.0) as resp:
+                self.assertEqual(resp.status, 200)
+
+            # Now Session 4 succeeds
+            st4, res4 = join("GuestD")
+            self.assertEqual(st4, 200)
+        finally:
+            gw.stop()
+            room.closed = True
+            server.shutdown()
+            server.server_close()
 
 
 if __name__ == "__main__":
