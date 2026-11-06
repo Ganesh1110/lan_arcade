@@ -919,3 +919,108 @@ input:focus, select:focus {
   animation: pulseWin 0.8s infinite alternate;
   border: 3px solid #fff;
 }
+
+/* 3. Memory Match */
+.memory-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 480px;
+}
+
+.memory-scoreboard {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  padding: 0.5rem;
+  background-color: var(--bg-input);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.memory-score-item {
+  color: var(--ansi-cyan);
+}
+
+.memory-grid {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.memory-card {
+  aspect-ratio: 1;
+  perspective: 600px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  border-radius: var(--radius-md);
+}
+
+.memory-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.4s;
+  transform-style: preserve-3d;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.memory-card.flipped .memory-card-inner {
+  transform: rotateY(180deg);
+}
+
+.memory-card.selected .memory-card-inner {
+  outline: 3px solid var(--ansi-cyan);
+  box-shadow: 0 0 12px var(--ansi-cyan);
+}
+
+.memory-card-front, .memory-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+}
+
+.memory-card-front {
+  background: linear-gradient(135deg, #1e293b, #334155);
+  color: #94a3b8;
+  border: 2px solid var(--border-color);
+  font-size: 1.15rem;
+  font-family: var(--font-mono);
+}
+
+.memory-card-front:hover {
+  border-color: var(--ansi-cyan);
+  color: var(--text-primary);
+}
+
+.memory-card-back {
+  background-color: var(--bg-card);
+  border: 2px solid var(--primary);
+  font-size: 2rem;
+  transform: rotateY(180deg);
+}
+
+.memory-card.matched .memory-card-back {
+  border-color: var(--success);
+  background-color: rgba(16, 185, 129, 0.15);
+  opacity: 0.85;
+}
+
+.memory-card.last-reveal:not(.matched) .memory-card-back {
+  border-color: var(--warning);
+  background-color: rgba(245, 158, 11, 0.15);
+}

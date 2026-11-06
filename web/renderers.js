@@ -127,4 +127,108 @@
     wrapper.appendChild(grid);
     container.appendChild(wrapper);
   });
+
+  // 3. MEMORY MATCH RENDERER
+  let memorySelectedCard = null; // Local selection state for picking 2 cards
+
+  window.LANArcade.registerRenderer('memory_match', function (container, view, submitAction) {
+    container.textContent = '';
+    const rows = view.rows || 4;
+    const cols = view.cols || 4;
+    const board = view.board || [];
+    const matchedCoords = new Set((view.matched || []).map(c => `${c[0]},${c[1]}`));
+    const lastReveal = view.last_reveal || null;
+    const isMyTurn = window.LANArcade.state.isMyTurn;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'memory-wrapper';
+
+    // Scores summary bar
+    const scoreboard = document.createElement('div');
+    scoreboard.className = 'memory-scoreboard';
+    const players = view.players || [];
+    const scores = view.scores || {};
+    players.forEach(p => {
+      const pScore = document.createElement('div');
+      pScore.className = 'memory-score-item';
+      pScore.textContent = `${p.name}: ${scores[p.id] || 0} pairs`;
+      scoreboard.appendChild(pScore);
+    });
+    wrapper.appendChild(scoreboard);
+
+    // Cards Grid
+    const grid = document.createElement('div');
+    grid.className = 'memory-grid';
+    grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    grid.setAttribute('role', 'grid');
+    grid.setAttribute('aria-label', 'Memory Match Cards');
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const coordStr = `${String.fromCharCode(65 + c)}${r + 1}`;
+        const isMatched = matchedCoords.has(`${r},${c}`);
+        const isRevealedCard1 = lastReveal && lastReveal.card1 && lastReveal.card1.row === r && lastReveal.card1.col === c;
+        const isRevealedCard2 = lastReveal && lastReveal.card2 && lastReveal.card2.row === r && lastReveal.card2.col === c;
+        const faceSymbol = (board[r] && board[r][c]) ||
+          (isRevealedCard1 ? lastReveal.card1.symbol : (isRevealedCard2 ? lastReveal.card2.symbol : null));
+
+        const card = document.createElement('button');
+        card.className = 'memory-card';
+        card.setAttribute('role', 'gridcell');
+        card.setAttribute('aria-label', `Card ${coordStr}`);
+
+        const inner = document.createElement('div');
+        inner.className = 'memory-card-inner';
+
+        const front = document.createElement('div');
+        front.className = 'memory-card-front';
+        front.textContent = coordStr; // Back of card shows coordinate
+
+        const back = document.createElement('div');
+        back.className = 'memory-card-back';
+        back.textContent = faceSymbol || '❓'; // Front shows emoji face
+
+        inner.appendChild(front);
+        inner.appendChild(back);
+        card.appendChild(inner);
+
+        if (isMatched) {
+          card.classList.add('flipped', 'matched');
+          card.disabled = true;
+        } else if (isRevealedCard1 || isRevealedCard2) {
+          card.classList.add('flipped', 'last-reveal');
+        }
+
+        if (memorySelectedCard === coordStr) {
+          card.classList.add('selected');
+        }
+
+        if (isMyTurn && !isMatched) {
+          card.addEventListener('click', function () {
+            if (!memorySelectedCard) {
+              // First card selected
+              memorySelectedCard = coordStr;
+              card.classList.add('selected');
+            } else if (memorySelectedCard === coordStr) {
+              // Clicked same card -> deselect
+              memorySelectedCard = null;
+              card.classList.remove('selected');
+            } else {
+              // Second card selected -> submit action "A1 B2"
+              const act = `${memorySelectedCard} ${coordStr}`;
+              memorySelectedCard = null;
+              submitAction(act);
+            }
+          });
+        } else {
+          card.disabled = true;
+        }
+
+        grid.appendChild(card);
+      }
+    }
+
+    wrapper.appendChild(grid);
+    container.appendChild(wrapper);
+  });
 })();
