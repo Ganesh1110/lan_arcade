@@ -1,6 +1,63 @@
 # 🎮 College LAN Arcade
 
-A modular, terminal-based multiplayer LAN game platform built in Python. Designed for playing games over college Wi-Fi/LAN networks without needing external internet access, databases, or third-party dependencies.
+A modular, multiplayer LAN game platform built in Python. Designed for playing games over college Wi-Fi/LAN networks without needing external internet access, databases, or third-party dependencies. Playable both in **native terminals** and **modern web browsers on laptops, tablets, and phones**!
+
+---
+
+## 🌐 Play in Your Browser (No Installation for Friends!)
+
+Friends can now join and play every game right inside their web browser on any phone, tablet, or laptop — no terminal required!
+
+```
+Host PC (Terminal or Headless) ───► Serves Web UI ───► Friend's Phone (Safari/Chrome)
+                                                  ───► Friend's Laptop (Browser)
+                                                  ───► Terminal Players (Mixed Room!)
+```
+
+### 1. Starting Web Mode as Host
+
+You can enable Web Mode using a CLI flag or the in-terminal menu:
+
+- **Command Line**:
+  ```bash
+  python3 lan_core.py --web
+  # Or specify a custom port:
+  python3 lan_core.py --web 8080
+  ```
+
+- **With an Optional Room Password**:
+  ```bash
+  python3 lan_core.py --web 8080 --password secret123
+  # Or via environment variable:
+  ARCADE_PASSWORD=secret123 python3 lan_core.py --web
+  ```
+
+- **From the Host Menu**:
+  1. Run `python3 lan_core.py` and select **1. Host a LAN Game**.
+  2. Toggle **Option 1: Toggle Web Browser Mode** to **ENABLED**.
+  3. Select any game to host.
+
+### 2. Sharing with Friends
+When your room starts, the terminal prints:
+- **Web Arcade URL**: `http://<host-ip>:<port>` (e.g. `http://192.168.1.50:8080`)
+- **QR Code**: Scan the ASCII QR code in your terminal directly with your phone's camera to join instantly!
+
+### 3. Mobile & Cross-Platform Features
+- **Responsive on Any Screen**: Tailored layouts for phones (from 360 px width) up to full desktop monitors.
+- **Dedicated Graphical Boards (Phase 2)**:
+  - **Tic-Tac-Toe**: Tap cells on an interactive 3x3 grid with win-line highlights.
+  - **Connect Four**: Click/tap column drop buttons with animated chip drops.
+  - **Memory Match**: 3D animated card flips with face-reveal tracking and pair scoring.
+  - **Battleship**: Dual grids — fire upon enemy waters with hit/miss feedback and inspect your fleet.
+  - **Chess**: Interactive checkered board, auto-flipped to your perspective, check alerts, and pawn promotion modal.
+  - **Wordle**: Dual boards with color feedback and a clickable on-screen keyboard.
+  - **2048**: Touch swipe gestures, on-screen D-pad, and Arrow/WASD key controls.
+  - **Snake & Ladders**: 100-square boustrophedon board with token markers and interactive 3D dice button.
+- **Universal Fallback**: All other games (Bingo, Dots & Boxes, Hangman, Shiritori, Quiz Show, etc.) run seamlessly in the browser via the ANSI-to-safe-HTML dashboard.
+- **Mixed Room Support**: Terminal players and browser players can compete in the exact same match simultaneously!
+- **Audio Synthesizer**: Built-in sound effects using the Web Audio API (off by default, toggled with the 🔇/🔔 icon).
+- **Windows Firewall Note**: When hosting on Windows, click "Allow" on Private Networks when Windows Firewall prompts, so friends on your Wi-Fi can reach the server.
+- **Security & Privacy**: Strict Content Security Policy (CSP), rate limiting, body size caps, HTML-escaped DOM insertions (`textContent`), and strict server-side filtering of hidden information. Plain HTTP over LAN (no TLS required).
 
 ---
 

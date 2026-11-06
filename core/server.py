@@ -643,12 +643,33 @@ def run_dedicated_server(port=DEFAULT_PORT):
     print("\n" + paint("DEDICATED OFFICE LAN ARCADE SERVER IS RUNNING", "1;32"))
     print(f"  Server Address : {paint(get_lan_ip(), '1;33')}")
     print(f"  Listening Port : {paint(port, '1;33')}")
-    print("\nPlayers can connect from their PCs using 'python3 lan_core.py' -> '2. Join a LAN Game'.")
+
+    web_gateway = None
+    if config.WEB_ENABLED:
+        try:
+            from core.web_gateway import WebGateway
+            web_gateway = WebGateway(
+                tcp_port=port,
+                web_port=config.DEFAULT_WEB_PORT,
+                password=config.ARCADE_PASSWORD,
+                max_players=room.max_players
+            )
+            web_actual_port = web_gateway.start()
+            print(f"  Web Arcade URL : {paint(f'http://{get_lan_ip()}:{web_actual_port}', '1;32')}")
+        except Exception as e:
+            print(paint(f"  Could not start web gateway: {e}", "33"))
+
+    print("\nPlayers can connect from their PCs using 'python3 lan_core.py' -> '2. Join a LAN Game', or open the Web URL in a browser.")
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nDedicated server stopped.")
     finally:
+        if web_gateway:
+            try:
+                web_gateway.stop()
+            except Exception:
+                pass
         server.shutdown()
         server.server_close()
