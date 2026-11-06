@@ -491,4 +491,161 @@
     wrapper.appendChild(boardEl);
     container.appendChild(wrapper);
   });
+
+  // 6. WORDLE RENDERER
+  let wordleCurrentInput = ''; // Tracks letters being typed before Enter
+
+  window.LANArcade.registerRenderer('wordle', function (container, view, submitAction) {
+    container.textContent = '';
+    const myGuesses = view.my_guesses || [];
+    const oppGuesses = view.opp_guesses || [];
+    const isMyTurn = window.LANArcade.state.isMyTurn;
+    const oppName = view.opponent_name || 'Opponent';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'wordle-wrapper';
+
+    // Dual Board Container
+    const boardsRow = document.createElement('div');
+    boardsRow.className = 'wordle-boards-row';
+
+    // 1. My Board
+    const myBoardSec = document.createElement('div');
+    myBoardSec.className = 'wordle-board-sec';
+    const myTitle = document.createElement('h4');
+    myTitle.textContent = 'Your Board';
+    myBoardSec.appendChild(myTitle);
+
+    const myGrid = document.createElement('div');
+    myGrid.className = 'wordle-grid';
+
+    for (let r = 0; r < 6; r++) {
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'wordle-row';
+
+      const evaluated = myGuesses[r];
+      const isCurrentRow = r === myGuesses.length && isMyTurn;
+
+      for (let c = 0; c < 5; c++) {
+        const tile = document.createElement('div');
+        tile.className = 'wordle-tile';
+
+        if (evaluated) {
+          const [letter, status] = evaluated[c];
+          tile.textContent = letter;
+          tile.classList.add(`wordle-${status}`);
+        } else if (isCurrentRow && c < wordleCurrentInput.length) {
+          tile.textContent = wordleCurrentInput[c];
+          tile.classList.add('wordle-filled');
+        } else {
+          tile.classList.add('wordle-empty');
+        }
+        rowDiv.appendChild(tile);
+      }
+      myGrid.appendChild(rowDiv);
+    }
+    myBoardSec.appendChild(myGrid);
+    boardsRow.appendChild(myBoardSec);
+
+    // 2. Opponent Progress Board (Letters masked)
+    const oppBoardSec = document.createElement('div');
+    oppBoardSec.className = 'wordle-board-sec';
+    const oppTitle = document.createElement('h4');
+    oppTitle.textContent = `${oppName}'s Progress`;
+    oppBoardSec.appendChild(oppTitle);
+
+    const oppGrid = document.createElement('div');
+    oppGrid.className = 'wordle-grid';
+
+    for (let r = 0; r < 6; r++) {
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'wordle-row';
+      const evaluated = oppGuesses[r];
+
+      for (let c = 0; c < 5; c++) {
+        const tile = document.createElement('div');
+        tile.className = 'wordle-tile';
+        if (evaluated) {
+          const [, status] = evaluated[c];
+          tile.textContent = '•';
+          tile.classList.add(`wordle-${status}`);
+        } else {
+          tile.classList.add('wordle-empty');
+        }
+        rowDiv.appendChild(tile);
+      }
+      oppGrid.appendChild(rowDiv);
+    }
+    oppBoardSec.appendChild(oppGrid);
+    boardsRow.appendChild(oppBoardSec);
+
+    wrapper.appendChild(boardsRow);
+
+    // Compute keyboard letter statuses
+    const keyStatuses = {};
+    myGuesses.forEach(g => {
+      g.forEach(([letter, status]) => {
+        const l = letter.toUpperCase();
+        if (status === 'green') {
+          keyStatuses[l] = 'green';
+        } else if (status === 'yellow' && keyStatuses[l] !== 'green') {
+          keyStatuses[l] = 'yellow';
+        } else if (status === 'gray' && !keyStatuses[l]) {
+          keyStatuses[l] = 'gray';
+        }
+      });
+    });
+
+    // 3. On-screen Keyboard
+    const kb = document.createElement('div');
+    kb.className = 'wordle-keyboard';
+    const kbLayout = [
+      ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+      ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+      ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '⌫']
+    ];
+
+    kbLayout.forEach(rowKeys => {
+      const kbRow = document.createElement('div');
+      kbRow.className = 'wordle-kb-row';
+      rowKeys.forEach(k => {
+        const keyBtn = document.createElement('button');
+        keyBtn.className = 'wordle-key';
+        keyBtn.textContent = k;
+        if (k === 'ENTER' || k === '⌫') {
+          keyBtn.classList.add('wordle-key-wide');
+        } else if (keyStatuses[k]) {
+          keyBtn.classList.add(`wordle-${keyStatuses[k]}`);
+        }
+
+        if (isMyTurn) {
+          keyBtn.addEventListener('click', () => {
+            if (k === '⌫') {
+              if (wordleCurrentInput.length > 0) {
+                wordleCurrentInput = wordleCurrentInput.slice(0, -1);
+                window.LANArcade.registerRenderer('wordle')(container, view, submitAction);
+              }
+            } else if (k === 'ENTER') {
+              if (wordleCurrentInput.length === 5) {
+                const guessToSend = wordleCurrentInput;
+                wordleCurrentInput = '';
+                submitAction(guessToSend);
+              }
+            } else if (wordleCurrentInput.length < 5) {
+              wordleCurrentInput += k;
+              window.LANArcade.registerRenderer('wordle')(container, view, submitAction);
+            }
+          });
+        } else {
+          keyBtn.disabled = true;
+        }
+
+        kbRow.appendChild(keyBtn);
+      });
+      kb.appendChild(kbRow);
+    });
+
+    wrapper.appendChild(kb);
+    container.appendChild(wrapper);
+  });
 })();

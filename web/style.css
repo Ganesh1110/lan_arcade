@@ -1203,3 +1203,132 @@ input:focus, select:focus {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* 6. Wordle */
+.wordle-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 600px;
+}
+
+.wordle-boards-row {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.wordle-board-sec {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.wordle-board-sec h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.wordle-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wordle-row {
+  display: flex;
+  gap: 4px;
+}
+
+.wordle-tile {
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.wordle-tile.wordle-empty {
+  background-color: var(--bg-input);
+}
+
+.wordle-tile.wordle-filled {
+  border-color: var(--ansi-cyan);
+  background-color: var(--bg-card);
+  animation: tilePop 0.1s ease-in;
+}
+
+@keyframes tilePop {
+  50% { transform: scale(1.08); }
+}
+
+.wordle-tile.wordle-green, .wordle-key.wordle-green {
+  background-color: #15803d;
+  color: #fff;
+  border-color: #15803d;
+}
+
+.wordle-tile.wordle-yellow, .wordle-key.wordle-yellow {
+  background-color: #b45309;
+  color: #fff;
+  border-color: #b45309;
+}
+
+.wordle-tile.wordle-gray, .wordle-key.wordle-gray {
+  background-color: #3f3f46;
+  color: #a1a1aa;
+  border-color: #3f3f46;
+}
+
+.wordle-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.wordle-kb-row {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.wordle-key {
+  height: 44px;
+  min-width: 32px;
+  padding: 0 6px;
+  background-color: var(--border-color);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: opacity 0.1s, transform 0.05s;
+}
+
+.wordle-key:active {
+  transform: scale(0.95);
+}
+
+.wordle-key.wordle-key-wide {
+  min-width: 54px;
+  font-size: 0.75rem;
+}
