@@ -346,4 +346,149 @@
 
     container.appendChild(wrapper);
   });
+
+  // 5. CHESS RENDERER
+  const CHESS_UNICODE = {
+    'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
+    'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
+  };
+
+  let chessSelectedSquare = null; // { r, c, coord }
+
+  window.LANArcade.registerRenderer('chess_game', function (container, view, submitAction) {
+    container.textContent = '';
+    const board = view.board || [];
+    const mySide = view.side || 'White';
+    const isWhite = mySide === 'White';
+    const isMyTurn = window.LANArcade.state.isMyTurn;
+    const lastMove = view.last_move || null;
+    const inCheck = view.in_check || false;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chess-wrapper';
+
+    // Promotion modal if pending
+    const promotionModal = document.createElement('div');
+    promotionModal.className = 'chess-promotion-modal hidden';
+    promotionModal.setAttribute('role', 'dialog');
+    promotionModal.setAttribute('aria-label', 'Pawn Promotion');
+    wrapper.appendChild(promotionModal);
+
+    const boardEl = document.createElement('div');
+    boardEl.className = 'chess-board';
+    boardEl.setAttribute('role', 'grid');
+    boardEl.setAttribute('aria-label', 'Chessboard');
+
+    // Display perspective: if Black, flip rows/cols so player's pieces are at bottom
+    const rowIndices = isWhite ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+    const colIndices = isWhite ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+
+    for (let rIdx = 0; rIdx < 8; rIdx++) {
+      const r = rowIndices[rIdx];
+      for (let cIdx = 0; cIdx < 8; cIdx++) {
+        const c = colIndices[cIdx];
+        const coord = `${String.fromCharCode(97 + c)}${8 - r}`;
+        const piece = board[r] ? board[r][c] : null;
+        const isPieceWhite = piece && piece === piece.toUpperCase();
+        const isPieceMine = piece && (isWhite ? isPieceWhite : !isPieceWhite);
+
+        const sq = document.createElement('button');
+        sq.className = `chess-sq ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
+        sq.setAttribute('role', 'gridcell');
+        sq.setAttribute('aria-label', `${coord} ${piece ? piece : 'empty'}`);
+
+        if (piece) {
+          const pSpan = document.createElement('span');
+          pSpan.className = `chess-piece ${isPieceWhite ? 'white-piece' : 'black-piece'}`;
+          pSpan.textContent = CHESS_UNICODE[piece] || piece;
+          sq.appendChild(pSpan);
+        }
+
+        // Highlight last move
+        if (lastMove && lastMove.from && lastMove.to) {
+          const [fr, fc] = lastMove.from;
+          const [tr, tc] = lastMove.to;
+          if ((r === fr && c === fc) || (r === tr && c === tc)) {
+            sq.classList.add('chess-last-move');
+          }
+        }
+
+        // Highlight King in check
+        if (inCheck && piece && piece.toUpperCase() === 'K' && isPieceMine) {
+          sq.classList.add('chess-check');
+        }
+
+        // Highlight selected
+        if (chessSelectedSquare && chessSelectedSquare.r === r && chessSelectedSquare.c === c) {
+          sq.classList.add('chess-selected');
+        }
+
+        if (isMyTurn) {
+          sq.addEventListener('click', function () {
+            if (!chessSelectedSquare) {
+              if (isPieceMine) {
+                chessSelectedSquare = { r, c, coord, piece };
+                sq.classList.add('chess-selected');
+              }
+            } else if (chessSelectedSquare.r === r && chessSelectedSquare.c === c) {
+              // Clicked same square -> cancel selection
+              chessSelectedSquare = null;
+              sq.classList.remove('chess-selected');
+            } else if (isPieceMine) {
+              // Switch selection to another friendly piece
+              chessSelectedSquare = { r, c, coord, piece };
+              const prev = boardEl.querySelector('.chess-selected');
+              if (prev) prev.classList.remove('chess-selected');
+              sq.classList.add('chess-selected');
+            } else {
+              // Target destination square clicked!
+              const fromCoord = chessSelectedSquare.coord;
+              const toCoord = coord;
+              const movingPiece = chessSelectedSquare.piece;
+              const isPawnPromotion = movingPiece && movingPiece.toUpperCase() === 'P' && (r === 0 || r === 7);
+
+              if (isPawnPromotion) {
+                // Show promotion picker
+                promotionModal.textContent = '';
+                const promoTitle = document.createElement('h4');
+                promoTitle.textContent = 'Promote Pawn To:';
+                promotionModal.appendChild(promoTitle);
+
+                const promoChoices = ['Q', 'R', 'B', 'N'];
+                const promoLabels = { 'Q': 'Queen', 'R': 'Rook', 'B': 'Bishop', 'N': 'Knight' };
+                const choicesDiv = document.createElement('div');
+                choicesDiv.className = 'chess-promo-choices';
+
+                promoChoices.forEach(choice => {
+                  const pBtn = document.createElement('button');
+                  pBtn.className = 'btn btn-secondary';
+                  const sym = isWhite ? choice : choice.toLowerCase();
+                  pBtn.textContent = `${CHESS_UNICODE[sym]} ${promoLabels[choice]}`;
+                  pBtn.addEventListener('click', () => {
+                    promotionModal.classList.add('hidden');
+                    chessSelectedSquare = null;
+                    submitAction(`${fromCoord}${toCoord}=${choice}`);
+                  });
+                  choicesDiv.appendChild(pBtn);
+                });
+
+                promotionModal.appendChild(choicesDiv);
+                promotionModal.classList.remove('hidden');
+              } else {
+                chessSelectedSquare = null;
+                submitAction(`${fromCoord}${toCoord}`);
+              }
+            }
+          });
+        } else {
+          sq.disabled = true;
+        }
+
+        boardEl.appendChild(sq);
+      }
+    }
+
+    wrapper.appendChild(boardEl);
+    container.appendChild(wrapper);
+  });
 })();
