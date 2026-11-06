@@ -231,4 +231,119 @@
     wrapper.appendChild(grid);
     container.appendChild(wrapper);
   });
+
+  // 4. BATTLESHIP RENDERER
+  window.LANArcade.registerRenderer('battleship', function (container, view, submitAction) {
+    container.textContent = '';
+    const myShots = view.my_shots || {};
+    const oppShots = view.opp_shots || {};
+    const ownGrid = view.own_grid || [];
+    const isMyTurn = window.LANArcade.state.isMyTurn;
+    const oppName = view.opponent_name || 'Opponent';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bs-wrapper';
+
+    // 1. Radar / Target Grid (Enemy Waters)
+    const targetSection = document.createElement('div');
+    targetSection.className = 'bs-section';
+    const targetTitle = document.createElement('h3');
+    targetTitle.textContent = `🎯 Target Grid (${oppName}'s Waters)`;
+    targetSection.appendChild(targetTitle);
+
+    const targetGrid = document.createElement('div');
+    targetGrid.className = 'bs-grid';
+
+    // Header row (A-E)
+    targetGrid.appendChild(document.createElement('div')); // empty corner
+    for (let c = 0; c < 5; c++) {
+      const colLabel = document.createElement('div');
+      colLabel.className = 'bs-label';
+      colLabel.textContent = String.fromCharCode(65 + c);
+      targetGrid.appendChild(colLabel);
+    }
+
+    for (let r = 0; r < 5; r++) {
+      const rowLabel = document.createElement('div');
+      rowLabel.className = 'bs-label';
+      rowLabel.textContent = String(r + 1);
+      targetGrid.appendChild(rowLabel);
+
+      for (let c = 0; c < 5; c++) {
+        const coordKey = `${r},${c}`;
+        const coordStr = `${String.fromCharCode(65 + c)}${r + 1}`;
+        const cell = document.createElement('button');
+        cell.className = 'bs-cell';
+        cell.setAttribute('aria-label', `Fire at ${coordStr}`);
+
+        if (coordKey in myShots) {
+          const isHit = myShots[coordKey];
+          cell.textContent = isHit ? '💥' : '🌊';
+          cell.classList.add(isHit ? 'bs-hit' : 'bs-miss');
+          cell.disabled = true;
+        } else {
+          cell.textContent = '';
+          if (isMyTurn) {
+            cell.classList.add('bs-fireable');
+            cell.addEventListener('click', () => submitAction(coordStr));
+          } else {
+            cell.disabled = true;
+          }
+        }
+        targetGrid.appendChild(cell);
+      }
+    }
+    targetSection.appendChild(targetGrid);
+    wrapper.appendChild(targetSection);
+
+    // 2. Friendly Fleet Grid (Your Ships)
+    const fleetSection = document.createElement('div');
+    fleetSection.className = 'bs-section';
+    const fleetTitle = document.createElement('h3');
+    fleetTitle.textContent = '🛡️ Your Fleet';
+    fleetSection.appendChild(fleetTitle);
+
+    const fleetGrid = document.createElement('div');
+    fleetGrid.className = 'bs-grid';
+
+    fleetGrid.appendChild(document.createElement('div'));
+    for (let c = 0; c < 5; c++) {
+      const colLabel = document.createElement('div');
+      colLabel.className = 'bs-label';
+      colLabel.textContent = String.fromCharCode(65 + c);
+      fleetGrid.appendChild(colLabel);
+    }
+
+    for (let r = 0; r < 5; r++) {
+      const rowLabel = document.createElement('div');
+      rowLabel.className = 'bs-label';
+      rowLabel.textContent = String(r + 1);
+      fleetGrid.appendChild(rowLabel);
+
+      for (let c = 0; c < 5; c++) {
+        const coordKey = `${r},${c}`;
+        const cell = document.createElement('div');
+        cell.className = 'bs-cell bs-fleet-cell';
+        const hasShip = ownGrid[r] && ownGrid[r][c] !== null;
+
+        if (hasShip) {
+          cell.classList.add('bs-ship');
+        }
+
+        if (coordKey in oppShots) {
+          const isHit = oppShots[coordKey];
+          cell.textContent = isHit ? '💥' : '🌊';
+          cell.classList.add(isHit ? 'bs-hit' : 'bs-miss');
+        } else if (hasShip) {
+          cell.textContent = '🚢';
+        }
+
+        fleetGrid.appendChild(cell);
+      }
+    }
+    fleetSection.appendChild(fleetGrid);
+    wrapper.appendChild(fleetSection);
+
+    container.appendChild(wrapper);
+  });
 })();

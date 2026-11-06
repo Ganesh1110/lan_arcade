@@ -1024,3 +1024,87 @@ input:focus, select:focus {
   border-color: var(--warning);
   background-color: rgba(245, 158, 11, 0.15);
 }
+
+/* 4. Battleship */
+.bs-wrapper {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 720px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.bs-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  flex: 1;
+  min-width: 260px;
+}
+
+.bs-section h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.bs-grid {
+  display: grid;
+  grid-template-columns: 24px repeat(5, 1fr);
+  gap: 4px;
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 1;
+}
+
+.bs-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.bs-cell {
+  background-color: #0c4a6e; /* Deep ocean */
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  aspect-ratio: 1;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.bs-cell.bs-fireable {
+  cursor: crosshair;
+}
+
+.bs-cell.bs-fireable:hover {
+  background-color: rgba(239, 68, 68, 0.4);
+  border-color: var(--danger);
+  transform: scale(1.05);
+}
+
+.bs-cell.bs-hit {
+  background-color: rgba(239, 68, 68, 0.3);
+  border-color: var(--danger);
+}
+
+.bs-cell.bs-miss {
+  background-color: rgba(148, 163, 184, 0.15);
+}
+
+.bs-fleet-cell.bs-ship {
+  background-color: #1e3a8a;
+  border-color: var(--ansi-cyan);
+}
